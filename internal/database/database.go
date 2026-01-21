@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"autotitle/internal/util"
+	"github.com/soymadip/autotitle/internal/util"
 )
 
 type EpisodeData struct {

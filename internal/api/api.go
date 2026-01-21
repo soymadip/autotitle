@@ -3,22 +3,25 @@
 package api
 
 import (
-	"autotitle/internal/config"
-	"autotitle/internal/database"
-	"autotitle/internal/fetcher"
-	"autotitle/internal/matcher"
-	"autotitle/internal/renamer"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+
+	"github.com/soymadip/autotitle/internal/config"
+	"github.com/soymadip/autotitle/internal/database"
+	"github.com/soymadip/autotitle/internal/fetcher"
+	"github.com/soymadip/autotitle/internal/matcher"
+	"github.com/soymadip/autotitle/internal/renamer"
 )
 
-// ExtractMALID extracts the numeric MAL ID from a MyAnimeList URL
+// Extracts the MAL ID from a MyAnimeList URL
 func ExtractMALID(url string) int {
+
 	re := regexp.MustCompile(`myanimelist\.net/anime/(\d+)`)
 	matches := re.FindStringSubmatch(url)
+
 	if len(matches) > 1 {
 		if id, err := strconv.Atoi(matches[1]); err == nil {
 			return id
@@ -38,6 +41,8 @@ type Options struct {
 	Quiet      bool
 	ConfigPath string
 	Force      bool
+	Anime      string
+	Filler     string
 }
 
 // WithDryRun enables dry-run mode (preview changes without applying)
@@ -70,9 +75,20 @@ func WithForce() Option {
 	return func(o *Options) { o.Force = true }
 }
 
+// WithAnime sets the anime name or MAL URL
+func WithAnime(anime string) Option {
+	return func(o *Options) { o.Anime = anime }
+}
+
+// WithFiller sets the anime filler list URL or slug
+func WithFiller(filler string) Option {
+	return func(o *Options) { o.Filler = filler }
+}
+
 // Rename renames anime episodes in the specified directory
 func Rename(path string, opts ...Option) error {
 	options := &Options{}
+
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -83,14 +99,33 @@ func Rename(path string, opts ...Option) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	// Load map config
+	mapCfg, err := config.LoadMap(path, globalCfg.MapFile)
+
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to load map configuration: %w", err)
+		}
+
+		return fmt.Errorf("no map file found at %s. Run 'autotitle init' first.", filepath.Join(path, globalCfg.MapFile))
+	}
+
 	// Create renamer
 	r := &renamer.Renamer{
-		Config:   globalCfg,
+		Config:    globalCfg,
+		MapConfig: mapCfg,
 		DryRun:   options.DryRun,
 		NoBackup: options.NoBackup,
 		Verbose:  options.Verbose,
 		Quiet:    options.Quiet,
 	}
+
+	// Initialize DB in renamer
+	db, err := database.New("") // Use default cache dir
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+	r.DB = db
 
 	// Execute rename
 	return r.Execute(path)
@@ -228,9 +263,10 @@ func DBGen(malURL string, opts ...func(*DBGenOptions)) error {
 	return nil
 }
 
-// Init creates a new _autotitle.yml config file in the specified directory
+// Creates a new map file in the specified directory
 func Init(path string, opts ...Option) error {
 	options := &Options{}
+
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -250,14 +286,15 @@ func Init(path string, opts ...Option) error {
 
 	// Check if exists
 	if _, err := os.Stat(configPath); err == nil && !options.Force {
-		return fmt.Errorf("config file already exists at %s (use WithForce to overwrite)", configPath)
+		return fmt.Errorf("Config file already exists at %s (use WithForce to overwrite)", configPath)
 	}
 
 	// Detect pattern from first video file
 	var detectedPattern string
+
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
+		return fmt.Errorf("Failed to read directory: %w", err)
 	}
 
 	for _, e := range entries {
@@ -278,20 +315,30 @@ func Init(path string, opts ...Option) error {
 		inputPattern = "Episode {{EP_NUM}} {{RES}}.{{EXT}}"
 	}
 
+	malURL := options.Anime
+	if malURL == "" {
+		malURL = "https://myanimelist.net/anime/XXXXX/Series_Name"
+	}
+
+	aflURL := options.Filler
+	if aflURL == "" {
+		aflURL = "https://www.animefillerlist.com/shows/series-name"
+	}
+
 	content := fmt.Sprintf(`# Autotitle Map File
 targets:
   - path: "."
-    mal_url: "https://myanimelist.net/anime/XXXXX/Series_Name"   # Replace with actual MAL page URL
-    afl_url: "https://www.animefillerlist.com/shows/series-name" # Replace with animeFilterList page url or 'null' if not found
+    mal_url: "%s"   # Replace with actual MAL page URL
+    afl_url: "%s" # Replace with animeFilterList page url or 'null' if not found
     patterns:
       - input:
           - "%s"      # AUTO GENERATED, VERIFY
-        output: "%s" # Default output format
-`, inputPattern, globalCfg.Output)
+        output: "%s"  # Default output format
+`, malURL, aflURL, inputPattern, globalCfg.Output)
 
 	// Write file
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+		return fmt.Errorf("Failed to write config file: %w", err)
 	}
 
 	return nil
@@ -391,7 +438,7 @@ func FindSeriesByQuery(query string, outputDir string) ([]Match, error) {
 			continue // Skip malformed db files
 		}
 
-		if sd.Slug == querySlug {
+		if sd.MALID == query || sd.Slug == querySlug {
 			matches = append(matches, Match{
 				MALID:        sd.MALID,
 				Title:        sd.Title,

@@ -10,13 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"autotitle/internal/logger"
-	"autotitle/internal/util"
-
+	"github.com/soymadip/autotitle/internal/logger"
+	"github.com/soymadip/autotitle/internal/util"
 	"golang.org/x/net/html"
 )
 
-const JikanAPIURL = "https://api.jikan.moe/v4"
+const JikanAPIURL   = "https://api.jikan.moe/v4"
 const FillerListURL = "https://www.animefillerlist.com/shows"
 
 type Fetcher struct {
@@ -24,6 +23,7 @@ type Fetcher struct {
 	RateLimit time.Duration
 }
 
+// New creates a new Fetcher instance
 func New(rateLimit int, timeout int) *Fetcher {
 	return &Fetcher{
 		Client: &http.Client{
@@ -47,7 +47,7 @@ type AnimeInfo struct {
 	ImageURL      string   `json:"image_url"`
 }
 
-// FetchAnimeInfo fetches detailed anime information from the Jikan API
+// Fetches detailed anime information from the Jikan API
 func (f *Fetcher) FetchAnimeInfo(malID int) (*AnimeInfo, error) {
 	f.sleep()
 	url := fmt.Sprintf("%s/anime/%d", JikanAPIURL, malID)
@@ -101,7 +101,7 @@ func (f *Fetcher) FetchAnimeInfo(malID int) (*AnimeInfo, error) {
 
 
 
-// FetchEpisodes fetches all episodes for a given MAL ID
+// Fetches all episodes for a given MAL ID
 func (f *Fetcher) FetchEpisodes(malID int) (map[int]EpisodeInfo, error) {
 	episodes := make(map[int]EpisodeInfo)
 	page := 1
@@ -113,7 +113,7 @@ func (f *Fetcher) FetchEpisodes(malID int) (map[int]EpisodeInfo, error) {
 
 		resp, err := f.Client.Get(url)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch episodes from Jikan API for MAL ID %d (page %d): %w", malID, page, err)
+			return nil, fmt.Errorf("Failed to fetch episodes from Jikan API for MAL ID %d (page %d): %w", malID, page, err)
 		}
 
 		if resp.StatusCode == 429 {
@@ -141,12 +141,13 @@ func (f *Fetcher) FetchEpisodes(malID int) (map[int]EpisodeInfo, error) {
 
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			resp.Body.Close()
-			return nil, fmt.Errorf("failed to parse Jikan API response for MAL ID %d (page %d): %w", malID, page, err)
+			return nil, fmt.Errorf("Failed to parse Jikan API response for MAL ID %d (page %d): %w", malID, page, err)
 		}
 		resp.Body.Close()
 
 		for _, ep := range result.Data {
 			var airDate time.Time
+
 			if ep.Aired != nil {
 				// Try RFC3339 first, then simplified date format
 				t, err := time.Parse(time.RFC3339, *ep.Aired)
@@ -166,6 +167,7 @@ func (f *Fetcher) FetchEpisodes(malID int) (map[int]EpisodeInfo, error) {
 		}
 
 		lastPage = result.Pagination.LastVisiblePage
+
 		if lastPage == 0 {
 			lastPage = page
 		}
@@ -178,7 +180,7 @@ func (f *Fetcher) FetchEpisodes(malID int) (map[int]EpisodeInfo, error) {
 	return episodes, nil
 }
 
-// FetchFillers fetches filler episode numbers from AnimeFillerList
+// Fetches filler episode numbers from AnimeFillerList
 func (f *Fetcher) FetchFillers(slug string) ([]int, error) {
 	url := fmt.Sprintf("%s/%s", FillerListURL, slug)
 
@@ -186,6 +188,7 @@ func (f *Fetcher) FetchFillers(slug string) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch filler list from AnimeFillerList for slug %s: %w", slug, err)
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
@@ -214,9 +217,12 @@ func parseFillerHTML(r io.Reader) ([]int, error) {
 	var crawler func(*html.Node)
 
 	crawler = func(node *html.Node) {
+
 		if node.Type == html.ElementNode && node.Data == "div" {
 			class := getAttr(node, "class")
+
 			if strings.Contains(class, "filler") && !strings.Contains(class, "canon") {
+
 				// Found filler div, extract episode numbers
 				if span := findChildByClass(node, "span", "Episodes"); span != nil {
 					text := getText(span)
@@ -267,14 +273,16 @@ func getText(n *html.Node) string {
 	if n.Type == html.TextNode {
 		return n.Data
 	}
+
 	var text string
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		text += getText(c)
 	}
+
 	return text
 }
 
-// GenerateSlug converts a title to a URL-safe slug
+// Converts a title to a URL-safe slug
 func GenerateSlug(title string) string {
 	slug := strings.ToLower(title)
 
@@ -286,16 +294,19 @@ func GenerateSlug(title string) string {
 
 	// Normalize consecutive hyphens
 	slug = regexp.MustCompile(`-+`).ReplaceAllString(slug, "-")
+
 	return strings.Trim(slug, "-")
 }
 
-// ExtractMALID extracts the numeric ID from a MyAnimeList URL
+// Extracts the numeric ID from a MyAnimeList URL
 func ExtractMALID(url string) int {
 	re := regexp.MustCompile(`myanimelist\.net/anime/(\d+)`)
 	matches := re.FindStringSubmatch(url)
+	
 	if len(matches) > 1 {
 		id, _ := strconv.Atoi(matches[1])
 		return id
 	}
+
 	return 0
 }

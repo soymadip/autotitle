@@ -6,7 +6,7 @@
 
 package autotitle
 
-import "autotitle/internal/api"
+import "github.com/soymadip/autotitle/internal/api"
 
 // Re-export all types from internal/api
 type (

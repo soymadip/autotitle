@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"autotitle/internal/api"
-	"autotitle/internal/logger"
+	"github.com/soymadip/autotitle/internal/api"
+	"github.com/soymadip/autotitle/internal/logger"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,9 @@ var (
 	flagAnime  string
 	flagFiller string
 	flagForce  bool
-	flagAll    bool // for db rm -a
+	flagAll    bool 
+
+	Version = "v0.1.0"
 )
 
 func main() {
@@ -115,7 +117,16 @@ func main() {
 		Run:   runClean,
 	}
 
-	rootCmd.AddCommand(initCmd, dbCmd, undoCmd, cleanCmd)
+	// Version command
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print the version number of autotitle",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("autotitle %s\n", Version)
+		},
+	}
+
+	rootCmd.AddCommand(initCmd, dbCmd, undoCmd, cleanCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -155,6 +166,12 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 	if flagForce {
 		opts = append(opts, api.WithForce())
+	}
+	if flagAnime != "" {
+		opts = append(opts, api.WithAnime(flagAnime))
+	}
+	if flagFiller != "" {
+		opts = append(opts, api.WithFiller(flagFiller))
 	}
 
 	if err := api.Init(path, opts...); err != nil {

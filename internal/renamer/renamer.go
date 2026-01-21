@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"autotitle/internal/config"
-	"autotitle/internal/database"
-	"autotitle/internal/fetcher"
-	"autotitle/internal/logger"
-	"autotitle/internal/matcher"
+	"github.com/soymadip/autotitle/internal/config"
+	"github.com/soymadip/autotitle/internal/database"
+	"github.com/soymadip/autotitle/internal/fetcher"
+	"github.com/soymadip/autotitle/internal/logger"
+	"github.com/soymadip/autotitle/internal/matcher"
 )
 
 // Renamer orchestrates the file renaming process
