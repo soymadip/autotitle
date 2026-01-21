@@ -1,11 +1,11 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info/
-hental/
+GEMINI.md
 
-# Virtual environments
-.venv
+# Build artifacts
+bin/
+
+# Testing
+test/
+
+# Backup directories
+_backup/
+BKP/

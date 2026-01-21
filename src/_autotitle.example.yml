@@ -1,0 +1,14 @@
+# Autotitle Map File
+
+# Directories to process (supports future recursive mode)
+# Each target can have its own config, or inherit from others (id is required if extended)
+targets:
+  - path: "."
+    id: "main" # Optional, but needed for `extends`
+    mal_url: "https://myanimelist.net/anime/235/Meitantei_Conan"
+    afl_url: "https://www.animefillerlist.com/shows/detective-conan"
+    patterns:
+      - input:
+          - "DC_remastered_{{EP_NUM}}_{{RES}}.{{EXT}}"
+          - "Detective Conan - {{EP_NUM}}.{{EXT}}"
+        output: "DC {{EP_NUM}} {{FILLER}} - {{EP_NAME}}.{{EXT}}"

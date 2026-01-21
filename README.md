@@ -1,57 +1,198 @@
 # Autotitle
 
-A tool for renaming series episodes with proper titles, mark fillers.
+A CLI tool & Go library for automatically renaming anime episodes with proper titles and detecting filler episodes.
 
 ## Features
 
-> [!WARNING]
-> This project is in planning stage.  
-
-- Automatically renames episodes to a consistent format
-- Marks filler episodes based on a filler list
-- Adds episode titles from a database
-- Special handling for movies
-- Creates backups before renaming
+- 🎯 **Automatic Episode Renaming** - Pattern-based filename matching and generation
+- 🎨 **Flexible Pattern Matching** - Support for multiple filename formats with `{{TEMPLATE}}` variables
+- 🔖 **Filler Detection** - Automatically marks filler episodes with `[F]` tag
+- 📚 **Episode Database** - Caches episode data from MyAnimeList and AnimeFillerList
+- 💾 **Smart Backups** - Automatic backup before renaming with restore capability
+- 📦 **Library & CLI** - Use as standalone tool or import as Go package
+- 🏗️ **Clean Architecture** - Pure business logic API with zero UI dependencies
 
 ## Installation
-<!-- 
-```bash
-pip install autotitle
-```
-Or install directly from this repository:
- -->
+
+### As CLI Tool
 
 ```bash
-pipx install .
+go install github.com/soymadip/autotitle/cmd/autotitle@latest
 ```
 
-## Usage
+Or clone and build:
 
 ```bash
-autotitle /path/to/episodes
+git clone https://github.com/soymadip/autotitle.git && cd autotitle
+make install
+
+autotitle --help
 ```
 
-### Options
+### As Library
 
-- `-dd, --data-directory`: Directory containing files to rename (default: current directory)
-- `-f, --filler-file`: Path to file containing filler episode numbers
-- `-n, --names-file`: Path to file containing episode and movie names
+```bash
+go get github.com/soymadip/autotitle
+```
 
+## Quick Start
 
-## Example Output
+### CLI Usage
+
+```bash
+# Navigate to your anime directory
+cd /path/to/videos
+
+# Initialize configuration (auto-detects patterns)
+autotitle init
+
+# Preview changes (dry-run)
+autotitle --dry-run .
+
+# Perform rename
+autotitle .
+
+# Restore from backup if needed
+autotitle undo .
+
+# Clean backup directory
+autotitle clean .
+```
+
+### Library Usage
+
+```go
+package main
+
+import (
+	"fmt"
+	"autotitle"
+)
+
+func main() {
+	// Rename files in directory
+	err := autotitle.Rename("/path/to/videos",
+		autotitle.WithDryRun(),
+	)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+}
+```
+
+## Configuration
+
+When you run `autotitle init`, it creates `_autotitle.yml` with auto-detected patterns:
+
+```yaml
+# Autotitle Map File
+targets:
+  - path: "."
+    mal_url: "https://myanimelist.net/anime/XXXXX/Series_Name"
+    afl_url: "https://www.animefillerlist.com/shows/series-name"
+    patterns:
+      - input:
+          - "Episode {{EP_NUM}} {{RES}}.{{EXT}}"
+        output: "{{SERIES}} {{EP_NUM}} {{FILLER}} - {{EP_NAME}}.{{EXT}}"
+```
+
+## mal_url & afl_url
+
+- To get `mal_url`, visit [MyAnimeList](https://myanimelist.net/) and find the series, copy the URL.
+- To get `afl_url`, visit [AnimeFillerList](https://www.animefillerlist.com/) and find the series, copy the URL. In case the series is not listed/no filler, just use `null`.
+
+### Template Variables
+
+These are the variables that will be replaced in the output template.
+
+| Variable      | Description                       | Example                   |
+| ------------- | --------------------------------- | ------------------------- |
+| `{{SERIES}}`  | Anime series name (from database) | `Attack on Titan`         |
+| `{{EP_NUM}}`  | Episode number (padded)           | `001`, `123`              |
+| `{{EP_NAME}}` | Episode title (from database)     | `The Fall of Shiganshina` |
+| `{{FILLER}}`  | Filler marker                     | `[F]` or empty            |
+| `{{RES}}`     | Resolution                        | `1080p`, `720p`           |
+| `{{EXT}}`     | File extension                    | `mkv`, `mp4`              |
+| `{{ANY}}`     | Match arbitrary text              | `[SubGroup]`              |
+
+## CLI Commands
+
+### Main Commands
+
+```bash
+autotitle <path>              # Rename files in directory
+autotitle init [path]         # Create _autotitle.yml config file
+autotitle undo <path>         # Restore from backup
+autotitle clean <path>        # Remove backup directory
+```
+
+### Database Commands
+
+```bash
+autotitle db gen <mal_url|mal_id>    # Generate database (writes extended DB; prints title/episode count)
+autotitle db path                    # Show database directory
+autotitle db list                    # List all cached databases (shows MAL ID and stored title)
+autotitle db info <id|url|query>     # Show database info; accepts MAL ID, MAL URL, or title/slug query
+autotitle db rm <id|url|query>       # Remove specific database; accepts MAL ID, MAL URL, or title/slug query
+autotitle db rm -a                   # Remove all databases
+```
+
+### Flags
+
+| Flag          | Short | Description                      |
+| ------------- | ----- | -------------------------------- |
+| `--dry-run`   | `-d`  | Preview changes without applying |
+| `--no-backup` | `-n`  | Skip backup creation             |
+| `--verbose`   | `-v`  | Show detailed output             |
+| `--quiet`     | `-q`  | Suppress output except errors    |
+| `--config`    | `-c`  | Custom config file path          |
+| `--force`     | `-f`  | Overwrite existing files/configs |
+
+## Global Configuration
+
+The global config file is located at:
+
+- Linux/macOS: `~/.config/autotitle/config.yml`
+
+The local episode database files are stored in the cache directory:
+
+- Default: `~/.cache/autotitle/db/`
+
+## Project Architecture
 
 ```
-Searching for series files in '/path/to/episodes'...
-
-Renaming:-
-
-=> Detective Conan Remastered 001 - English Subtitle.mkv
-   └─> 1 - The Roller Coaster Murder Case - 1080p.mkv
-
-=> Detective Conan Movie 01 - The Time-Bombed Skyscraper.mkv
-   └─> Movie 1 - The Time-Bombed Skyscraper (1997) - 1080p.mkv
-
-Summary: 2 files renamed (0 fillers marked, 1 movie)
-Backup: 2 files backed up to /path/to/episodes/_backup
-Skipped: 0 files
+autotitle/
+├── cmd/autotitle/main.go    ← CLI orchestration
+├── autotitle.go             ← Public package wrapper
+└── internal/
+    ├── api/                 ← Core business logic
+    ├── database/            ← Data persistence
+    ├── config/              ← Configuration loading
+    ├── matcher/             ← Pattern matching
+    ├── renamer/             ← File operations
+    ├── fetcher/             ← External APIs
+    ├── logger/              ← CLI logging
+    └── util/                ← Utilities
 ```
+
+**Key Principle:** All business logic lives in `internal/api` with zero dependencies on logging or UI concerns. This makes the code testable and reusable.
+
+## Documentation
+
+- **[internal/README.md](internal/README.md)** - Complete API reference and internal package documentation
+  - Quick Start guide
+  - Full API documentation
+  - CLI to package function mapping
+  - Internal package details
+  - Advanced usage examples
+  - Notes: `db gen` writes extended DB files (title, slug, aliases). Public API exposes `ExtractMALID()` and `FindSeriesByQuery()` to help resolve MAL URLs/IDs and title/slug queries.
+
+## Data Sources
+
+- **MyAnimeList (MAL)** - Episode titles and metadata
+- **AnimeFillerList** - Filler/mixed episode detection
+- **Local Cache** - Episodes cached for offline use
+
+## License
+
+MIT

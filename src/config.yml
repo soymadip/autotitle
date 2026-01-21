@@ -1,0 +1,31 @@
+# Autotitle Global Configuration
+# Location: ~/.config/autotitle/config.yml or /etc/autotitle/config.yml
+
+map_file: _autotitle.yml
+
+# Default patterns (map file can override/extend)
+# Available: {{SERIES}}, {{EP_NUM}}, {{EP_NAME}}, {{FILLER}}, {{RES}}, {{EXT}}, {{ANY}}
+patterns:
+  - input: 
+      - "{{EP_NUM}}.{{EXT}}"
+      - "Episode {{EP_NUM}}.{{EXT}}"
+
+    output: "{{SERIES}} {{EP_NUM}} {{FILLER}} - {{EP_NAME}}.{{EXT}}"
+
+
+
+# Default video file extensions to scan
+formats: [mkv, mp4, avi, webm, m4v, ts, flv]
+
+# API settings
+api:
+  # api rate limit (requests per second)
+  rate_limit: 3
+
+  # HTTP/api timeout in seconds
+  timeout: 30
+
+# Backup settings
+backup:
+  # Backup directory name
+  dir_name: ".autotitle_backup"
