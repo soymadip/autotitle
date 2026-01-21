@@ -100,20 +100,6 @@ func (r *Renamer) Execute(targetPath string) error {
 		patterns = r.Config.Patterns
 	}
 
-	// Compile them
-	var compiledPatterns []*matcher.Pattern
-
-	for _, p := range patterns {
-		for _, inputTmpl := range p.Input {
-			cp, err := matcher.Compile(inputTmpl)
-			if err != nil {
-				logger.Error("Failed to compile pattern '%s': %v", inputTmpl, err)
-				continue
-			}
-			compiledPatterns = append(compiledPatterns, cp)
-		}
-	}
-
 	// Output template fallback
 	defaultOutput := r.Config.Output
 
@@ -268,8 +254,6 @@ func (r *Renamer) Execute(targetPath string) error {
 			if !r.Quiet {
 				logger.Error("Rename failed: %v", err)
 			}
-		} else {
-			// Log success?
 		}
 	}
 
@@ -378,9 +362,3 @@ func parseEpNum(s string) (int, error) {
 	return strconv.Atoi(s)
 }
 
-// Helper for TTY check
-func isTerminal() bool {
-	// check stdout fd
-	stat, _ := os.Stdout.Stat()
-	return (stat.Mode() & os.ModeCharDevice) != 0
-}

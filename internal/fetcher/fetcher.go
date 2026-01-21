@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-const JikanAPIURL   = "https://api.jikan.moe/v4"
+const JikanAPIURL = "https://api.jikan.moe/v4"
 const FillerListURL = "https://www.animefillerlist.com/shows"
 
 type Fetcher struct {
@@ -98,8 +98,6 @@ func (f *Fetcher) FetchAnimeInfo(malID int) (*AnimeInfo, error) {
 		ImageURL:      result.Data.Images.Webp.LargeImageURL,
 	}, nil
 }
-
-
 
 // Fetches all episodes for a given MAL ID
 func (f *Fetcher) FetchEpisodes(malID int) (map[int]EpisodeInfo, error) {
@@ -302,7 +300,7 @@ func GenerateSlug(title string) string {
 func ExtractMALID(url string) int {
 	re := regexp.MustCompile(`myanimelist\.net/anime/(\d+)`)
 	matches := re.FindStringSubmatch(url)
-	
+
 	if len(matches) > 1 {
 		id, _ := strconv.Atoi(matches[1])
 		return id

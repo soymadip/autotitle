@@ -7,6 +7,7 @@ import (
 
 	"github.com/soymadip/autotitle/internal/api"
 	"github.com/soymadip/autotitle/internal/logger"
+	"github.com/soymadip/autotitle/internal/version"
 
 	"github.com/spf13/cobra"
 )
@@ -25,8 +26,6 @@ var (
 	flagForce     bool
 	flagAll       bool
 	flagRateLimit int
-
-	Version = "v0.1.0"
 )
 
 func main() {
@@ -124,7 +123,7 @@ func main() {
 		Use:   "version",
 		Short: "Print the version number of autotitle",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("autotitle %s\n", Version)
+			fmt.Printf("autotitle %s\n", version.String())
 		},
 	}
 

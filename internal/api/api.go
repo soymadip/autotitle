@@ -120,10 +120,10 @@ func Rename(path string, opts ...Option) error {
 	r := &renamer.Renamer{
 		Config:    globalCfg,
 		MapConfig: mapCfg,
-		DryRun:   options.DryRun,
-		NoBackup: options.NoBackup,
-		Verbose:  options.Verbose,
-		Quiet:    options.Quiet,
+		DryRun:    options.DryRun,
+		NoBackup:  options.NoBackup,
+		Verbose:   options.Verbose,
+		Quiet:     options.Quiet,
 	}
 
 	// Initialize DB in renamer
@@ -167,10 +167,10 @@ func Clean(path string) error {
 
 // DBGenOptions holds options for database generation
 type DBGenOptions struct {
-	MALURL    string
-	AFLURL    string
-	OutputDir string
-	Force     bool
+	MALURL     string
+	AFLURL     string
+	OutputDir  string
+	Force      bool
 	RateLimit  int
 	ConfigPath string
 }
@@ -186,15 +186,15 @@ func DBGen(malURL string, opts ...func(*DBGenOptions)) error {
 
 	// Load global config to check for default rate limit
 	globalCfg, _ := config.LoadGlobal(options.ConfigPath) // Ignore error, as defaults will be used
-	
+
 	// Create fetcher
 	// Use flag value if set, otherwise use config value, otherwise use hard default (1)
 	rateLimit := 1
-	
+
 	if globalCfg != nil && globalCfg.API.RateLimit > 0 {
 		rateLimit = globalCfg.API.RateLimit
 	}
-	
+
 	if options.RateLimit > 0 {
 		rateLimit = options.RateLimit
 	}

@@ -6,7 +6,10 @@
 
 package autotitle
 
-import "github.com/soymadip/autotitle/internal/api"
+import (
+	"github.com/soymadip/autotitle/internal/api"
+	"github.com/soymadip/autotitle/internal/version"
+)
 
 // Re-export all types from internal/api
 type (
@@ -43,3 +46,8 @@ var (
 	CompilePattern = api.CompilePattern
 	ExtractMALID   = api.ExtractMALID
 )
+
+// Version returns the version string of the library.
+func Version() string {
+	return version.String()
+}
