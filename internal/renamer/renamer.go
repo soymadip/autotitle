@@ -100,21 +100,17 @@ func (r *Renamer) Execute(targetPath string) error {
 		patterns = r.Config.Patterns
 	}
 
-	// Output template fallback
-	defaultOutput := r.Config.Output
-
 	type PatternPair struct {
-		Matcher *matcher.Pattern
-		Output  string
+		Matcher      *matcher.Pattern
+		OutputConfig config.OutputConfig
 	}
 
 	var pairs []PatternPair
 
 	for _, p := range patterns {
-		out := p.Output
-
-		if out == "" {
-			out = defaultOutput
+		// Skip patterns without fields
+		if len(p.Output.Fields) == 0 {
+			continue
 		}
 
 		for _, inputTmpl := range p.Input {
@@ -125,7 +121,10 @@ func (r *Renamer) Execute(targetPath string) error {
 				continue
 			}
 
-			pairs = append(pairs, PatternPair{Matcher: cp, Output: out})
+			pairs = append(pairs, PatternPair{
+				Matcher:      cp,
+				OutputConfig: p.GetOutputConfig(),
+			})
 		}
 	}
 
@@ -133,14 +132,14 @@ func (r *Renamer) Execute(targetPath string) error {
 	for _, file := range files {
 		// Try to match
 		var bestMatch map[string]string
-		var outputTmpl string
+		var matchedPair *PatternPair
 
 		matched := false
-		for _, pair := range pairs {
+		for i, pair := range pairs {
 			vars := pair.Matcher.Match(filepath.Base(file))
 			if vars != nil {
 				bestMatch = vars
-				outputTmpl = pair.Output
+				matchedPair = &pairs[i]
 				matched = true
 				break
 			}
@@ -183,7 +182,12 @@ func (r *Renamer) Execute(targetPath string) error {
 			tv.Filler = "[F]" // Standardize or config? user might want generic filler tag
 		}
 
-		newName := matcher.GenerateFilename(outputTmpl, tv)
+		// Generate new filename using field-based output
+		newName := matcher.GenerateFilenameFromFields(
+			matchedPair.OutputConfig.Fields,
+			matchedPair.OutputConfig.Separator,
+			tv,
+		)
 
 		// If no change, skip
 		if newName == filepath.Base(file) {

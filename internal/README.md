@@ -388,7 +388,7 @@ id := autotitle.ExtractMALID("https://myanimelist.net/anime/5114/Fullmetal_Alche
 
 #### CompilePattern
 
-Compile a template string into a pattern for matching and generation.
+Compile a template string into a pattern for matching filenames.
 
 ```go
 func CompilePattern(template string) (*Pattern, error)
@@ -396,16 +396,16 @@ func CompilePattern(template string) (*Pattern, error)
 
 **Parameters:**
 
-- `template`: Template string with placeholders
+- `template`: Template string with placeholders for matching input filenames
 
 **Returns:** Compiled Pattern and error
 
-**Available Placeholders:**
+**Available Placeholders (for input matching only):**
 
-- `{{SERIES}}` - Anime series name (stored in database from MyAnimeList)
-- `{{EP_NUM}}` - Episode number (zero-padded to 3 digits)
-- `{{EP_NAME}}` - Episode name/title (from database)
-- `{{FILLER}}` - Filler marker (e.g., "[F]" or empty)
+- `{{SERIES}}` - Anime series name
+- `{{EP_NUM}}` - Episode number
+- `{{EP_NAME}}` - Episode name/title
+- `{{FILLER}}` - Filler marker
 - `{{RES}}` - Resolution (e.g., 1080p)
 - `{{EXT}}` - File extension
 - `{{ANY}}` - Any characters
@@ -591,20 +591,22 @@ Pattern matching and filename generation.
 **Key exports:**
 
 - `GuessPattern(filename string) string` - Detect naming pattern from filename
-- `Compile(template string) (*Pattern, error)` - Compile template to regex
-- `GenerateFilename(template string, vars TemplateVars) string` - Generate filename from template
+- `Compile(template string) (*Pattern, error)` - Compile template to regex for input matching
+- `GenerateFilenameFromFields(fields, separator, vars) string` - Generate filename from field list
 - `TemplateVars` struct - Variables for substitution
 - `Pattern` type - Compiled pattern for matching
 
-**Template placeholders:**
+**Input template placeholders:**
 
 - `{{SERIES}}` - Anime series name
-- `{{EP_NUM}}` - Episode number (zero-padded to 3 digits)
+- `{{EP_NUM}}` - Episode number
 - `{{EP_NAME}}` - Episode title
 - `{{FILLER}}` - Filler marker (e.g., `[F]`)
 - `{{RES}}` - Resolution (e.g., `1080p`)
 - `{{EXT}}` - File extension
 - `{{ANY}}` - Match any characters
+
+**Output generation:** Use field list with SERIES, EP_NUM, EP_NAME, FILLER, RES field names or literal strings.
 
 ### database/
 
@@ -728,17 +730,18 @@ if err != nil {
     return err
 }
 
-// Generate new filename
-newName := matcher.GenerateFilename(
-    "{{SERIES}} {{EP_NUM}} - {{EP_NAME}}.{{EXT}}",
+// Generate new filename using field-based format
+newName := matcher.GenerateFilenameFromFields(
+    []string{"SERIES", "EP_NUM", "EP_NAME"},
+    " - ",
     matcher.TemplateVars{
         Series: "Attack on Titan",
         EpNum:  "1",
         EpName: "The Fall of Shiganshina",
-        Res:    "1080p",
         Ext:    "mkv",
     },
 )
+// Returns: "Attack on Titan - 001 - The Fall of Shiganshina.mkv"
 ```
 
 **Caution:** These are internal APIs and may change. Use the stable `autotitle.CompilePattern()` when possible.

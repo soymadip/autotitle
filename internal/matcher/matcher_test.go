@@ -65,58 +65,96 @@ func TestGuessPattern(t *testing.T) {
 	}
 }
 
-func TestGenerateFilename(t *testing.T) {
-	vars := matcher.TemplateVars{
-		Series: "Test Series",
-		EpNum:  "1",
-		EpName: "Test Episode",
-		Filler: "",
-		Res:    "1080p",
-		Ext:    "mkv",
-	}
-
+func TestGenerateFilenameFromFields(t *testing.T) {
 	tests := []struct {
-		name     string
-		template string
-		vars     matcher.TemplateVars
-		want     string
+		name      string
+		fields    []string
+		separator string
+		vars      matcher.TemplateVars
+		want      string
 	}{
 		{
-			name:     "Standard Template",
-			template: "{{SERIES}} - {{EP_NUM}} - {{EP_NAME}}.{{EXT}}",
-			vars:     vars,
-			want:     "Test Series - 001 - Test Episode.mkv",
-		},
-		{
-			name:     "With Filler",
-			template: "{{SERIES}} - {{EP_NUM}} {{FILLER}}.{{EXT}}",
+			name:      "All fields populated",
+			fields:    []string{"SERIES", "EP_NUM", "FILLER", "EP_NAME"},
+			separator: " - ",
 			vars: matcher.TemplateVars{
 				Series: "Test Series",
-				EpNum:  "2",
+				EpNum:  "1",
+				EpName: "The Beginning",
 				Filler: "[F]",
 				Ext:    "mkv",
 			},
-			want: "Test Series - 002 [F].mkv",
+			want: "Test Series - 001 - [F] - The Beginning.mkv",
 		},
 		{
-			name:     "With Resolution",
-			template: "[{{RES}}] {{SERIES}} - {{EP_NUM}}.{{EXT}}",
-			vars:     vars,
-			want:     "[1080p] Test Series - 001.mkv",
+			name:      "Empty FILLER auto-skipped",
+			fields:    []string{"SERIES", "EP_NUM", "FILLER", "EP_NAME"},
+			separator: " - ",
+			vars: matcher.TemplateVars{
+				Series: "Test Series",
+				EpNum:  "1",
+				EpName: "The Beginning",
+				Filler: "", // Empty - should be skipped
+				Ext:    "mkv",
+			},
+			want: "Test Series - 001 - The Beginning.mkv",
 		},
 		{
-			name:     "Clean Spacing",
-			template: "{{SERIES}} {{EP_NUM}} {{FILLER}}.{{EXT}}", // Filler empty
-			vars:     vars,
-			want:     "Test Series 001 .mkv", // Double space reduced to single space, but space before . remains
+			name:      "Multiple empty fields skipped",
+			fields:    []string{"SERIES", "EP_NUM", "RES", "FILLER", "EP_NAME"},
+			separator: " - ",
+			vars: matcher.TemplateVars{
+				Series: "Test",
+				EpNum:  "1",
+				EpName: "Episode",
+				Filler: "", // Empty
+				Res:    "", // Empty
+				Ext:    "mkv",
+			},
+			want: "Test - 001 - Episode.mkv",
+		},
+		{
+			name:      "With literal prefix",
+			fields:    []string{"DC", "EP_NUM", "FILLER", "EP_NAME"},
+			separator: " - ",
+			vars: matcher.TemplateVars{
+				EpNum:  "5",
+				EpName: "Title",
+				Filler: "[F]",
+				Ext:    "mkv",
+			},
+			want: "DC - 005 - [F] - Title.mkv",
+		},
+		{
+			name:      "Different separator",
+			fields:    []string{"SERIES", "EP_NUM", "EP_NAME"},
+			separator: "_",
+			vars: matcher.TemplateVars{
+				Series: "Show",
+				EpNum:  "10",
+				EpName: "Test",
+				Ext:    "mp4",
+			},
+			want: "Show_010_Test.mp4",
+		},
+		{
+			name:      "Mixed literals and fields",
+			fields:    []string{"DC", "EP_NUM", "[Filler]", "EP_NAME"},
+			separator: " ",
+			vars: matcher.TemplateVars{
+				EpNum:  "3",
+				EpName: "Example",
+				Ext:    "mkv",
+			},
+			want: "DC 003 [Filler] Example.mkv",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := matcher.GenerateFilename(tt.template, tt.vars)
+			got := matcher.GenerateFilenameFromFields(tt.fields, tt.separator, tt.vars)
 			if got != tt.want {
-				t.Errorf("GenerateFilename() = %q; want %q", got, tt.want)
+				t.Errorf("GenerateFilenameFromFields() = %q; want %q", got, tt.want)
 			}
 		})
 	}

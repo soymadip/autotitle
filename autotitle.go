@@ -37,17 +37,18 @@ var (
 
 // Re-export all core functions
 var (
-	Rename         = api.Rename
-	Undo           = api.Undo
-	Clean          = api.Clean
-	DBGen          = api.DBGen
-	Init           = api.Init
-	DBPath         = api.DBPath
-	DBList         = api.DBList
-	DBInfo         = api.DBInfo
-	DBRm           = api.DBRm
-	CompilePattern = api.CompilePattern
-	ExtractMALID   = fetcher.ExtractMALID
+	Rename                     = api.Rename
+	Undo                       = api.Undo
+	Clean                      = api.Clean
+	DBGen                      = api.DBGen
+	Init                       = api.Init
+	DBPath                     = api.DBPath
+	DBList                     = api.DBList
+	DBInfo                     = api.DBInfo
+	DBRm                       = api.DBRm
+	CompilePattern             = api.CompilePattern
+	GenerateFilenameFromFields = api.GenerateFilenameFromFields
+	ExtractMALID               = fetcher.ExtractMALID
 )
 
 // Version returns the version string of the library.

@@ -12,7 +12,6 @@ import (
 type GlobalConfig struct {
 	MapFile  string       `yaml:"map_file"`
 	Patterns []Pattern    `yaml:"patterns"`
-	Output   string       `yaml:"output"` // Fallback output pattern if no patterns match
 	Formats  []string     `yaml:"formats"`
 	API      APIConfig    `yaml:"api"`
 	Backup   BackupConfig `yaml:"backup"`
@@ -24,6 +23,7 @@ type APIConfig struct {
 }
 
 type BackupConfig struct {
+	Enabled bool   `yaml:"enabled"`
 	DirName string `yaml:"dir_name"`
 }
 
@@ -42,8 +42,25 @@ type Target struct {
 }
 
 type Pattern struct {
-	Input  []string `yaml:"input"`
-	Output string   `yaml:"output"`
+	Input  []string     `yaml:"input"`
+	Output OutputConfig `yaml:"output"`
+}
+
+type OutputConfig struct {
+	Fields    []string `yaml:"fields"`
+	Separator string   `yaml:"separator,omitempty"` // Defaults to " - "
+}
+
+// GetOutputConfig returns the output config with defaults applied
+func (p *Pattern) GetOutputConfig() OutputConfig {
+	cfg := p.Output
+	
+	// Apply default separator if not specified
+	if cfg.Separator == "" {
+		cfg.Separator = " - "
+	}
+	
+	return cfg
 }
 
 // DefaultGlobalConfig returns the hardcoded default configuration.
@@ -51,12 +68,12 @@ func DefaultGlobalConfig() GlobalConfig {
 	return GlobalConfig{
 		MapFile: "_autotitle.yml",
 		Formats: []string{"mkv", "mp4", "avi", "webm", "m4v", "ts", "flv"},
-		Output:  "{{SERIES}} {{EP_NUM}} {{FILLER}} - {{EP_NAME}}.{{EXT}}",
 		API: APIConfig{
-			RateLimit: 1,
+			RateLimit: 2,
 			Timeout:   30,
 		},
 		Backup: BackupConfig{
+			Enabled: true,
 			DirName: ".autotitle_backup",
 		},
 	}

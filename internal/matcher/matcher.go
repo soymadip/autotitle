@@ -73,24 +73,36 @@ func (p *Pattern) Match(filename string) map[string]string {
 	return result
 }
 
-// GenerateFilename creates a new filename using the output template and variables
-func GenerateFilename(outputTemplate string, vars TemplateVars) string {
-	res := outputTemplate
-	res = strings.ReplaceAll(res, PlaceholderSeries, vars.Series)
-	res = strings.ReplaceAll(res, PlaceholderEpNum, padNumber(vars.EpNum, 3))
-	res = strings.ReplaceAll(res, PlaceholderEpName, vars.EpName)
-
-	// Filler logic: if vars.Filler is not empty (e.g. "[F]"), use it
-	res = strings.ReplaceAll(res, PlaceholderFiller, vars.Filler)
-
-	res = strings.ReplaceAll(res, PlaceholderRes, vars.Res)
-	res = strings.ReplaceAll(res, PlaceholderExt, vars.Ext)
-
-	// Clean up double spaces that might occur if a placeholder is empty
-	res = strings.ReplaceAll(res, "  ", " ")
-	res = strings.TrimSpace(res)
-
-	return res
+// GenerateFilenameFromFields builds filename from field list
+// Fields can be field names (uppercase) or literal strings
+// Only adds separator between non-empty values - no cleanup needed
+func GenerateFilenameFromFields(fields []string, separator string, vars TemplateVars) string {
+	if separator == "" {
+		separator = " - "
+	}
+	
+	fieldValues := map[string]string{
+		"SERIES":  vars.Series,
+		"EP_NUM":  padNumber(vars.EpNum, 3),
+		"EP_NAME": vars.EpName,
+		"FILLER":  vars.Filler,
+		"RES":     vars.Res,
+	}
+	
+	var parts []string
+	for _, field := range fields {
+		// Check if it's a field name (uppercase)
+		if value, ok := fieldValues[field]; ok {
+			if value != "" {
+				parts = append(parts, value)
+			}
+		} else {
+			// It's a literal string - always include
+			parts = append(parts, field)
+		}
+	}
+	
+	return strings.Join(parts, separator) + "." + vars.Ext
 }
 
 // padNumber pads a number string with zeros to width

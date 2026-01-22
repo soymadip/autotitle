@@ -338,8 +338,10 @@ targets:
     patterns:
       - input:
           - "%s"      # AUTO GENERATED, VERIFY
-        output: "%s"  # Default output format
-`, malURL, aflURL, inputPattern, globalCfg.Output)
+        output:
+          fields: [SERIES, EP_NUM, FILLER, EP_NAME, EXT]
+          separator: " - "  # Optional, defaults to " - "
+`, malURL, aflURL, inputPattern)
 
 	// Write file
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -436,7 +438,7 @@ type (
 
 // Re-export pattern utilities
 var (
-	CompilePattern   = matcher.Compile
-	GuessPattern     = matcher.GuessPattern
-	GenerateFilename = matcher.GenerateFilename
+	CompilePattern          = matcher.Compile
+	GuessPattern            = matcher.GuessPattern
+	GenerateFilenameFromFields = matcher.GenerateFilenameFromFields
 )

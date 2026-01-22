@@ -93,7 +93,38 @@ targets:
     patterns:
       - input:
           - "Episode {{EP_NUM}} {{RES}}.{{EXT}}"
-        output: "{{SERIES}} {{EP_NUM}} {{FILLER}} - {{EP_NAME}}.{{EXT}}"
+        output:
+          fields: [SERIES, EP_NUM, FILLER, EP_NAME]
+          separator: " - "  # Optional, defaults to " - "
+```
+
+### Output Format
+
+The field-based output format supports:
+- **Field names** (uppercase): SERIES, EP_NUM, FILLER, EP_NAME, RES
+- **Literal strings** (any text): "DC", "[v2]", "S01"
+- **Optional separator**: Defaults to ` - ` if not specified
+- **Auto-skip empty fields**: Empty fields are automatically excluded from output
+
+**Example:**
+```yaml
+output:
+  fields: [SERIES, EP_NUM, FILLER, EP_NAME]  # Standard format
+  separator: " - "  # Optional, defaults to " - "
+```
+
+**With literal strings:**
+```yaml
+output:
+  fields: ["DC", EP_NUM, FILLER, EP_NAME]  # Adds "DC" prefix
+  separator: " - "
+```
+
+**Different separator:**
+```yaml
+output:
+  fields: [SERIES, EP_NUM, EP_NAME]
+  separator: "_"  # Underscore separator
 ```
 
 ## mal_url & afl_url
@@ -101,19 +132,20 @@ targets:
 - To get `mal_url`, visit [MyAnimeList](https://myanimelist.net/) and find the series, copy the URL.
 - To get `afl_url`, visit [AnimeFillerList](https://www.animefillerlist.com/) and find the series, copy the URL. In case the series is not listed/no filler, just use `null`.
 
-### Template Variables
+### Available Fields
 
-These are the variables that will be replaced in the output template.
+These fields can be used in the output configuration.
 
-| Variable      | Description                       | Example                   |
-| ------------- | --------------------------------- | ------------------------- |
-| `{{SERIES}}`  | Anime series name (from database) | `Attack on Titan`         |
-| `{{EP_NUM}}`  | Episode number (padded)           | `001`, `123`              |
-| `{{EP_NAME}}` | Episode title (from database)     | `The Fall of Shiganshina` |
-| `{{FILLER}}`  | Filler marker                     | `[F]` or empty            |
-| `{{RES}}`     | Resolution                        | `1080p`, `720p`           |
-| `{{EXT}}`     | File extension                    | `mkv`, `mp4`              |
-| `{{ANY}}`     | Match arbitrary text              | `[SubGroup]`              |
+| Field Name | Description                       | Example                   | Notes                        |
+| ---------- | --------------------------------- | ------------------------- | ---------------------------- |
+| `SERIES`   | Anime series name (from database) | `Attack on Titan`         | Auto-populated               |
+| `EP_NUM`   | Episode number (padded to 3)      | `001`, `123`              | Auto-populated               |
+| `EP_NAME`  | Episode title (from database)     | `The Fall of Shiganshina` | Auto-populated               |
+| `FILLER`   | Filler marker                     | `[F]` or empty            | Auto-skipped if empty        |
+| `RES`      | Resolution                        | `1080p`, `720p`           | From input, skipped if empty |
+| `EXT`      | File extension                    | `mkv`, `mp4`              | Always included              |
+
+**Input Pattern Matching:** Use `{{FIELD_NAME}}` placeholders in input patterns to match filenames. `{{ANY}}` matches arbitrary text.
 
 ## CLI Commands
 
