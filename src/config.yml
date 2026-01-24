@@ -5,7 +5,7 @@
 map_file: _autotitle.yml
 
 # Default patterns (can be overridden in map files)
-# Available fields: SERIES, EP_NUM, EP_NAME, FILLER, RES
+# Available fields: SERIES, SERIES_EN, SERIES_JP, EP_NUM, EP_NAME, FILLER, RES
 # Fields can be field names (uppercase) or literal strings (quoted)
 patterns:
   - input: 

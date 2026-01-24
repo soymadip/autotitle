@@ -110,10 +110,9 @@ targets:
     afl_url: "https://www.animefillerlist.com/shows/series-name"
     patterns:
       - input:
-          - "Episode {{EP_NUM}} {{RES}}.{{EXT}}"
+          - "Episode {{EP_NUM}} {{RES}}"
         output:
           fields: [SERIES, EP_NUM, FILLER, EP_NAME]
-          separator: " - " # Optional, defaults to " - "
 ```
 
 ### Output Format
@@ -158,14 +157,14 @@ output:
 
 These fields can be used in the output configuration.
 
-| Field Name | Description                       | Example                   | Notes                        |
-| ---------- | --------------------------------- | ------------------------- | ---------------------------- |
-| `SERIES`   | Anime series name (from database) | `Attack on Titan`         | Auto-populated               |
-| `EP_NUM`   | Episode number (padded to 3)      | `001`, `123`              | Auto-populated               |
-| `EP_NAME`  | Episode title (from database)     | `The Fall of Shiganshina` | Auto-populated               |
-| `FILLER`   | Filler marker                     | `[F]` or empty            | Auto-skipped if empty        |
-| `RES`      | Resolution                        | `1080p`, `720p`           | From input, skipped if empty |
-| `EXT`      | File extension                    | `mkv`, `mp4`              | Always included              |
+| Field Name  | Description                       | Example                   | Notes                 |
+| ----------- | --------------------------------- | ------------------------- | --------------------- |
+| `SERIES`    | Anime series name (from database) | `Attack on Titan`         | Auto-populated        |
+| `SERIES_EN` | English series name               | `Attack on Titan`         | Auto-populated        |
+| `SERIES_JP` | Japanese series name              | `進撃の巨人`              | Auto-populated        |
+| `EP_NUM`    | Episode number (padded to 3)      | `001`, `123`              | Auto-populated        |
+| `EP_NAME`   | Episode title (from database)     | `The Fall of Shiganshina` | Auto-populated        |
+| `FILLER`    | Filler marker                     | `[F]` or empty            | Auto-skipped if empty |
 
 **Input Pattern Matching:** Use `{{FIELD_NAME}}` placeholders in input patterns to match filenames. `{{ANY}}` matches arbitrary text.
 

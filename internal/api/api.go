@@ -83,13 +83,11 @@ func Rename(path string, opts ...Option) error {
 		opt(options)
 	}
 
-	// Load global config
 	globalCfg, err := config.LoadGlobal(options.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Load map config
 	mapCfg, err := config.LoadMap(path, globalCfg.MapFile)
 
 	if err != nil {
@@ -100,7 +98,6 @@ func Rename(path string, opts ...Option) error {
 		return fmt.Errorf("no map file found at %s. Run 'autotitle init' first.", filepath.Join(path, globalCfg.MapFile))
 	}
 
-	// Create renamer
 	r := &renamer.Renamer{
 		Config:    globalCfg,
 		MapConfig: mapCfg,
@@ -110,14 +107,12 @@ func Rename(path string, opts ...Option) error {
 		Quiet:     options.Quiet,
 	}
 
-	// Initialize DB in renamer
 	db, err := database.New("") // Use default cache dir
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 	r.DB = db
 
-	// Execute rename
 	return r.Execute(path)
 }
 
@@ -168,10 +163,8 @@ func DBGen(malURL string, opts ...func(*DBGenOptions)) error {
 		opt(options)
 	}
 
-	// Load global config to check for default rate limit
 	globalCfg, _ := config.LoadGlobal(options.ConfigPath) // Ignore error, as defaults will be used
 
-	// Create fetcher
 	// Use flag value if set, otherwise use config value, otherwise use hard default (1)
 	rateLimit := 1
 
@@ -216,13 +209,11 @@ func DBGen(malURL string, opts ...func(*DBGenOptions)) error {
 		return fmt.Errorf("failed to fetch anime info: %w", err)
 	}
 
-	// Create database
 	db, err := database.New(options.OutputDir)
 	if err != nil {
 		return fmt.Errorf("failed to create database: %w", err)
 	}
 
-	// Check if database already exists
 	seriesID := fmt.Sprintf("%d", malID)
 	if db.Exists(seriesID) && !options.Force {
 		return fmt.Errorf("database already exists for series %s (use Force option to overwrite)", seriesID)
@@ -260,7 +251,6 @@ func DBGen(malURL string, opts ...func(*DBGenOptions)) error {
 		}
 	}
 
-	// Save to database
 	if err := db.Save(&seriesData); err != nil {
 		return fmt.Errorf("failed to save database: %w", err)
 	}
@@ -281,7 +271,6 @@ func Init(path string, opts ...Option) error {
 		return fmt.Errorf("failed to resolve path: %w", err)
 	}
 
-	// Load global config to get map file name
 	globalCfg, err := config.LoadGlobal(options.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
@@ -289,12 +278,10 @@ func Init(path string, opts ...Option) error {
 
 	configPath := filepath.Join(absPath, globalCfg.MapFile)
 
-	// Check if exists
 	if _, err := os.Stat(configPath); err == nil && !options.Force {
 		return fmt.Errorf("Config file already exists at %s (use WithForce to overwrite)", configPath)
 	}
 
-	// Detect pattern from first video file
 	var detectedPattern string
 
 	entries, err := os.ReadDir(path)
@@ -314,10 +301,9 @@ func Init(path string, opts ...Option) error {
 		}
 	}
 
-	// Generate config content
 	inputPattern := detectedPattern
 	if inputPattern == "" {
-		inputPattern = "Episode {{EP_NUM}} {{RES}}.{{EXT}}"
+		inputPattern = "Episode {{EP_NUM}} {{RES}}"
 	}
 
 	malURL := options.Anime
@@ -339,11 +325,10 @@ targets:
       - input:
           - "%s"      # AUTO GENERATED, VERIFY
         output:
-          fields: [SERIES, EP_NUM, FILLER, EP_NAME, EXT]
-          separator: " - "  # Optional, defaults to " - "
+          # Available fields: SERIES, SERIES_EN, SERIES_JP, EP_NUM, EP_NAME, FILLER, RES
+          fields: [SERIES, EP_NUM, FILLER, EP_NAME]
 `, malURL, aflURL, inputPattern)
 
-	// Write file
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("Failed to write config file: %w", err)
 	}
@@ -438,7 +423,7 @@ type (
 
 // Re-export pattern utilities
 var (
-	CompilePattern          = matcher.Compile
-	GuessPattern            = matcher.GuessPattern
+	CompilePattern             = matcher.Compile
+	GuessPattern               = matcher.GuessPattern
 	GenerateFilenameFromFields = matcher.GenerateFilenameFromFields
 )

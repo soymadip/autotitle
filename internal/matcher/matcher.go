@@ -2,27 +2,31 @@ package matcher
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 const (
-	PlaceholderSeries = "{{SERIES}}"
-	PlaceholderEpNum  = "{{EP_NUM}}"
-	PlaceholderEpName = "{{EP_NAME}}"
-	PlaceholderFiller = "{{FILLER}}"
-	PlaceholderRes    = "{{RES}}"
-	PlaceholderExt    = "{{EXT}}"
-	PlaceholderAny    = "{{ANY}}"
+	PlaceholderSeries   = "{{SERIES}}"
+	PlaceholderSeriesEn = "{{SERIES_EN}}"
+	PlaceholderSeriesJp = "{{SERIES_JP}}"
+	PlaceholderEpNum    = "{{EP_NUM}}"
+	PlaceholderEpName   = "{{EP_NAME}}"
+	PlaceholderFiller   = "{{FILLER}}"
+	PlaceholderRes      = "{{RES}}"
+	PlaceholderAny      = "{{ANY}}"
 )
 
 type TemplateVars struct {
-	Series string
-	EpNum  string
-	EpName string
-	Filler string
-	Res    string
-	Ext    string
+	Series   string
+	SeriesEn string
+	SeriesJp string
+	EpNum    string
+	EpName   string
+	Filler   string
+	Res      string
+	Ext      string
 }
 
 type Pattern struct {
@@ -40,7 +44,6 @@ func Compile(template string) (*Pattern, error) {
 	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderEpName), "(?P<EpName>.+)")
 	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderFiller), "(?P<Filler>.*)")
 	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderRes), "(?P<Res>\\d{3,4}p)")
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderExt), "(?P<Ext>[a-zA-Z0-9]+)")
 	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderAny), "(?P<Any>.*)")
 
 	// Anchor the regex to match full string
@@ -59,7 +62,14 @@ func Compile(template string) (*Pattern, error) {
 
 // Match attempts to match a filename against the compiled pattern
 func (p *Pattern) Match(filename string) map[string]string {
-	match := p.regex.FindStringSubmatch(filename)
+	ext := filepath.Ext(filename)
+	if ext == "" {
+		return nil
+	}
+
+	nameWithoutExt := strings.TrimSuffix(filename, ext)
+	match := p.regex.FindStringSubmatch(nameWithoutExt)
+
 	if match == nil {
 		return nil
 	}
@@ -70,6 +80,10 @@ func (p *Pattern) Match(filename string) map[string]string {
 			result[name] = match[i]
 		}
 	}
+
+	// Always populate Ext from file extension
+	result["Ext"] = strings.TrimPrefix(ext, ".")
+
 	return result
 }
 
@@ -80,15 +94,17 @@ func GenerateFilenameFromFields(fields []string, separator string, vars Template
 	if separator == "" {
 		separator = " - "
 	}
-	
+
 	fieldValues := map[string]string{
-		"SERIES":  vars.Series,
-		"EP_NUM":  padNumber(vars.EpNum, 3),
-		"EP_NAME": vars.EpName,
-		"FILLER":  vars.Filler,
-		"RES":     vars.Res,
+		"SERIES":    vars.Series,
+		"SERIES_EN": vars.SeriesEn,
+		"SERIES_JP": vars.SeriesJp,
+		"EP_NUM":    padNumber(vars.EpNum, 2),
+		"EP_NAME":   vars.EpName,
+		"FILLER":    vars.Filler,
+		"RES":       vars.Res,
 	}
-	
+
 	var parts []string
 	for _, field := range fields {
 		// Check if it's a field name (uppercase)
@@ -101,7 +117,7 @@ func GenerateFilenameFromFields(fields []string, separator string, vars Template
 			parts = append(parts, field)
 		}
 	}
-	
+
 	return strings.Join(parts, separator) + "." + vars.Ext
 }
 
@@ -110,8 +126,16 @@ func padNumber(s string, width int) string {
 	if s == "" {
 		return ""
 	}
-	if len(s) < width {
-		return strings.Repeat("0", width-len(s)) + s
+
+	// Parse as int to normalize
+	var n int
+
+	_, err := fmt.Sscanf(s, "%d", &n)
+	if err != nil {
+		return s // Return original if not a number
 	}
-	return s
+
+	// Format with padding
+	format := fmt.Sprintf("%%0%dd", width)
+	return fmt.Sprintf(format, n)
 }

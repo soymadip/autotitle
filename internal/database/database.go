@@ -52,10 +52,10 @@ type seriesDataJSON struct {
 	EpisodeCount  int           `json:"episode_count,omitempty"`
 	LastUpdate    time.Time     `json:"last_update"`
 	NextCheck     time.Time     `json:"next_check,omitempty"`
-	Episodes      []EpisodeData `json:"episodes"`
 	TitleEnglish  string        `json:"title_english,omitempty"`
 	TitleJapanese string        `json:"title_japanese,omitempty"`
 	TitleSynonyms []string      `json:"title_synonyms,omitempty"`
+	Episodes      []EpisodeData `json:"episodes"`
 }
 
 func (sd *SeriesData) MarshalJSON() ([]byte, error) {
@@ -79,10 +79,10 @@ func (sd *SeriesData) MarshalJSON() ([]byte, error) {
 		EpisodeCount:  sd.EpisodeCount,
 		LastUpdate:    sd.LastUpdate,
 		NextCheck:     sd.NextCheck,
-		Episodes:      episodes,
 		TitleEnglish:  sd.TitleEnglish,
 		TitleJapanese: sd.TitleJapanese,
 		TitleSynonyms: sd.TitleSynonyms,
+		Episodes:      episodes,
 	})
 }
 
@@ -134,8 +134,6 @@ func New(customDir string) (*DB, error) {
 }
 
 func (db *DB) Load(seriesID string) (*SeriesData, error) {
-
-	// Find file matching pattern: {ID}@*.json
 	pattern := filepath.Join(db.Dir, seriesID+"@*.json")
 
 	matches, err := filepath.Glob(pattern)
@@ -264,7 +262,6 @@ func (db *DB) List() ([]string, error) {
 		}
 	}
 
-	// Convert map to slice for deduplication
 	var ids []string
 	for id := range idsMap {
 		ids = append(ids, id)
@@ -327,7 +324,7 @@ func (db *DB) Find(query string) ([]SearchResult, error) {
 		}
 	}
 
-	// Fallback: Search all files by content (original behavior)
+	// Fallback: Search all files by content
 	ids, err := db.List()
 	if err != nil {
 		return nil, err
@@ -339,7 +336,6 @@ func (db *DB) Find(query string) ([]SearchResult, error) {
 			continue // Skip malformed db files
 		}
 
-		// Calculate match score based on how well title/aliases match
 		score := db.calculateMatchScore(sd, query, queryWords)
 		if score > 0 {
 			matches = append(matches, searchResultWithScore{

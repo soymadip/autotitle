@@ -80,10 +80,6 @@ func GuessPattern(filename string) string {
 	}
 
 Finalize:
-	// Add extension
-	if ext != "" {
-		pattern += ".{{EXT}}"
-	}
 
 	return pattern
 }

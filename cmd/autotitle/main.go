@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/mydehq/autotitle/internal/api"
+	"github.com/mydehq/autotitle/internal/config"
 	"github.com/mydehq/autotitle/internal/database"
 	"github.com/mydehq/autotitle/internal/fetcher"
 	"github.com/mydehq/autotitle/internal/logger"
@@ -65,9 +66,10 @@ func main() {
 	}
 
 	dbGenCmd := &cobra.Command{
-		Use:   "gen <mal_url>",
+		Use:   "gen [mal_url]",
 		Short: "Generate episode database from MAL",
-		Args:  cobra.ExactArgs(1),
+		Long:  "Generate episode database from MAL URL. If no URL is provided, it attempts to read the MAL URL from the config file in the current directory.",
+		Args:  cobra.MaximumNArgs(1),
 		Run:   runDBGen,
 	}
 	dbGenCmd.Flags().StringVarP(&flagFiller, "filler", "F", "", "AnimeFillerList URL or slug")
@@ -186,7 +188,45 @@ func runInit(cmd *cobra.Command, args []string) {
 }
 
 func runDBGen(cmd *cobra.Command, args []string) {
-	malURL := args[0]
+	var malURL string
+
+	if len(args) > 0 {
+		malURL = args[0]
+	} else {
+		// Try to load from local config
+		path := "."
+
+		// 1. Load global config to get map filename
+		globalCfg, err := config.LoadGlobal(flagConfig)
+		if err != nil {
+			logger.Fatal("Failed to load global config: %v", err)
+		}
+
+		// 2. Load map file
+		mapCfg, err := config.LoadMap(path, globalCfg.MapFile)
+		if err != nil {
+			logger.Fatal("Start either by providing a MAL URL or running 'init' to create a config file.\nError loading map file: %v", err)
+		}
+
+		// 3. Resolve target for current directory
+		target, err := mapCfg.ResolveTarget(path)
+		if err != nil {
+			logger.Fatal("Failed to resolve config for current directory: %v", err)
+		}
+
+		if target.MALURL == "" {
+			logger.Fatal("Map file found but 'mal_url' is missing. Please edit %s or provide URL as argument.", globalCfg.MapFile)
+		}
+
+		malURL = target.MALURL
+		logger.Info("Using MAL URL from config: %s", malURL)
+
+		// 4. Also use AFL URL from config if flag is not set
+		if flagFiller == "" && target.AFLURL != "" {
+			flagFiller = target.AFLURL
+			logger.Info("Using Filler URL from config: %s", flagFiller)
+		}
+	}
 
 	opts := func(o *api.DBGenOptions) {
 		o.MALURL = malURL
@@ -255,7 +295,7 @@ func runDBInfo(cmd *cobra.Command, args []string) {
 		for i, m := range matches {
 			fmt.Printf("  %d. %s (%s)\n", i+1, m.Title, m.MALID)
 		}
-		
+
 		fmt.Printf("Enter selection [1-%d]: ", len(matches))
 		var selection int
 		_, err := fmt.Scanln(&selection)
@@ -307,7 +347,7 @@ func runDBRm(cmd *cobra.Command, args []string) {
 		for i, m := range matches {
 			fmt.Printf("%d: %s (%s)\n", i+1, m.Title, m.MALID)
 		}
-		
+
 		fmt.Printf("Enter selection [1-%d]: ", len(matches))
 		var selection int
 		_, err := fmt.Scanln(&selection)

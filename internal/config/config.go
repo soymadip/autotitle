@@ -54,12 +54,11 @@ type OutputConfig struct {
 // GetOutputConfig returns the output config with defaults applied
 func (p *Pattern) GetOutputConfig() OutputConfig {
 	cfg := p.Output
-	
-	// Apply default separator if not specified
+
 	if cfg.Separator == "" {
 		cfg.Separator = " - "
 	}
-	
+
 	return cfg
 }
 
@@ -83,18 +82,15 @@ func DefaultGlobalConfig() GlobalConfig {
 func LoadGlobal(customPath string) (*GlobalConfig, error) {
 	cfg := DefaultGlobalConfig()
 
-	// 1. Determine config path
 	path := customPath
 	if path == "" {
 		path = findGlobalConfig()
 	}
 
 	if path == "" {
-		// No config found, return defaults
 		return &cfg, nil
 	}
 
-	// 2. Read and parse
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read global config at %s: %w", path, err)
@@ -125,7 +121,6 @@ func findGlobalConfig() string {
 		}
 	}
 
-	// /etc fallback
 	etcPath := "/etc/autotitle/config.yml"
 	if _, err := os.Stat(etcPath); err == nil {
 		return etcPath
@@ -140,10 +135,6 @@ func LoadMap(dir, filename string) (*MapConfig, error) {
 	path := filepath.Join(dir, filename)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		// Try .yaml extension if .yml not found (or vice-versa logic implicit if filename comes from config)
-		// Actually config says explicit filename, so we just try that.
-		// Use os.IsNotExist to return nil, nil if it's just missing?
-		// No, caller needs to know it's missing to possibly run 'init' logic or error out.
 		return nil, err
 	}
 
@@ -154,7 +145,6 @@ func LoadMap(dir, filename string) (*MapConfig, error) {
 	}
 
 	// If that failed or resulted in empty targets, try legacy/single-target format
-	// This supports the user's initial desire for a simple file
 	var singleTarget struct {
 		MALURL   string    `yaml:"mal_url"`
 		AFLURL   string    `yaml:"afl_url"`
@@ -165,7 +155,6 @@ func LoadMap(dir, filename string) (*MapConfig, error) {
 		return nil, fmt.Errorf("failed to parse map file at %s: %w", path, err)
 	}
 
-	// Convert to Target
 	t := Target{
 		Path:     ".",
 		MALURL:   singleTarget.MALURL,
@@ -173,7 +162,6 @@ func LoadMap(dir, filename string) (*MapConfig, error) {
 		Patterns: singleTarget.Patterns,
 	}
 
-	// Check for required URL
 	if t.MALURL == "" {
 		return nil, fmt.Errorf("invalid map file: missing mal_url")
 	}
@@ -184,17 +172,10 @@ func LoadMap(dir, filename string) (*MapConfig, error) {
 
 // ResolveTarget returns the configuration for a specific directory by resolving inheritance.
 func (mc *MapConfig) ResolveTarget(dir string) (*Target, error) {
-	// 1. Find the target for this path (handling relative paths)
-	// For now, simple string matching on "path". A more robust implementation involves checking filepath.Rel
 	var target *Target
 	for i := range mc.Targets {
-		// Clean paths for comparison
 		tPath := filepath.Clean(mc.Targets[i].Path)
 		dPath := filepath.Clean(dir)
-
-		// If path is ".", it matches the base dir where the map file is loaded from
-		// We are assuming 'dir' passed here is relative to map file location?
-		// Actually, LoadMap took 'dir'. So 'Path' in target is relative to 'dir'.
 
 		if tPath == dPath || (tPath == "." && (dPath == "." || dPath == "")) {
 			target = &mc.Targets[i]
@@ -206,20 +187,18 @@ func (mc *MapConfig) ResolveTarget(dir string) (*Target, error) {
 		return nil, fmt.Errorf("no target config found for directory: %s", dir)
 	}
 
-	// 2. Handle matches
 	if target.Extends != "" {
 		parent := mc.findTargetByID(target.Extends)
 		if parent == nil {
 			return nil, fmt.Errorf("target '%s' extends unknown id '%s'", target.Path, target.Extends)
 		}
-		// 4. Merge fields (target overrides parent)
 		merged := Target{
 			Path:     target.Path,
 			ID:       target.ID,
 			Extends:  target.Extends,
 			MALURL:   parent.MALURL,
 			AFLURL:   parent.AFLURL,
-			Patterns: parent.Patterns, // Start with parent patterns
+			Patterns: parent.Patterns,
 		}
 
 		// Override MALURL and AFLURL if target has non-empty values

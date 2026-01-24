@@ -40,7 +40,6 @@ func Init(quiet, noColor bool) {
 
 	if isNoColor {
 		color.NoColor = true
-		// Remove styling from icons if needed, but usually icons are just unicode characters
 	}
 }
 
@@ -64,10 +63,6 @@ func Info(format string, a ...interface{}) {
 
 // Warn prints a warning message (yellow warning sign)
 func Warn(format string, a ...interface{}) {
-	// Warnings are shown even in quiet mode?
-	// Usually quiet silences everything but errors.
-	// But implementation plan said "Suppress all output except errors".
-	// So Warn should be suppressed too.
 	if isQuiet {
 		return
 	}
