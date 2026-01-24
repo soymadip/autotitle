@@ -63,8 +63,15 @@ import (
 )
 
 func main() {
+    // Initialize config
+    err := autotitle.Init("/path/to/videos")
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
     // Preview changes
-    err := autotitle.Rename("/path/to/videos",
+    err = autotitle.Rename("/path/to/videos",
         autotitle.WithDryRun(),
     )
     if err != nil {
