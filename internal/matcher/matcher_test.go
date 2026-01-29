@@ -115,7 +115,7 @@ func TestGenerateFilenameFromFields(t *testing.T) {
 		},
 		{
 			name:      "With literal prefix",
-			fields:    []string{"DC", "EP_NUM", "FILLER", "EP_NAME"},
+			fields:    []string{"\"DC\"", "EP_NUM", "FILLER", "EP_NAME"},
 			separator: " - ",
 			vars: matcher.TemplateVars{
 				EpNum:  "5",
@@ -139,7 +139,7 @@ func TestGenerateFilenameFromFields(t *testing.T) {
 		},
 		{
 			name:      "Mixed literals and fields",
-			fields:    []string{"DC", "EP_NUM", "[Filler]", "EP_NAME"},
+			fields:    []string{"\"DC\"", "EP_NUM", "\"[Filler]\"", "EP_NAME"},
 			separator: " ",
 			vars: matcher.TemplateVars{
 				EpNum:  "3",
@@ -152,7 +152,11 @@ func TestGenerateFilenameFromFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := matcher.GenerateFilenameFromFields(tt.fields, tt.separator, tt.vars)
+			got, err := matcher.GenerateFilenameFromFields(tt.fields, tt.separator, tt.vars, 0)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
 			if got != tt.want {
 				t.Errorf("GenerateFilenameFromFields() = %q; want %q", got, tt.want)
 			}

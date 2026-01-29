@@ -1,57 +1,511 @@
-// Package autotitle provides high-level functions for renaming anime episodes
+// Package autotitle provides high-level functions for renaming media files
 // with proper titles and filler detection.
 //
-// This package mirrors the CLI functionality and provides a compatible API
-// for integrating autotitle into other Go applications.
-
+// This package provides a clean API for integrating autotitle into other Go applications.
 package autotitle
 
 import (
-	"github.com/mydehq/autotitle/internal/api"
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/mydehq/autotitle/internal/backup"
+	"github.com/mydehq/autotitle/internal/config"
 	"github.com/mydehq/autotitle/internal/database"
-	"github.com/mydehq/autotitle/internal/fetcher"
+	"github.com/mydehq/autotitle/internal/matcher"
+	"github.com/mydehq/autotitle/internal/provider"
+	_ "github.com/mydehq/autotitle/internal/provider/filler" // Register filler sources
+	"github.com/mydehq/autotitle/internal/renamer"
+	"github.com/mydehq/autotitle/internal/types"
 	"github.com/mydehq/autotitle/internal/version"
 )
 
-// Re-export all types from internal/api
+// Re-export types
 type (
-	Option       = api.Option
-	Options      = api.Options
-	DBGenOptions = api.DBGenOptions
-	Pattern      = api.Pattern
-	TemplateVars = api.TemplateVars
-	EpisodeData  = api.EpisodeData
-	SeriesData   = api.SeriesData
-	SearchResult = database.SearchResult
+	RenameOperation = types.RenameOperation
+	Media           = types.Media
+	Episode         = types.Episode
+	Event           = types.Event
+	EventHandler    = types.EventHandler
+	Pattern         = matcher.Pattern
+	TemplateVars    = matcher.TemplateVars
 )
 
-// Re-export all option constructors
-var (
-	WithDryRun   = api.WithDryRun
-	WithNoBackup = api.WithNoBackup
-	WithVerbose  = api.WithVerbose
-	WithQuiet    = api.WithQuiet
-	WithConfig   = api.WithConfig
-	WithForce    = api.WithForce
+// Event Types & Status
+const (
+	EventInfo     = types.EventInfo
+	EventSuccess  = types.EventSuccess
+	EventWarning  = types.EventWarning
+	EventError    = types.EventError
+	EventProgress = types.EventProgress
+
+	StatusPending = types.StatusPending
+	StatusSuccess = types.StatusSuccess
+	StatusSkipped = types.StatusSkipped
+	StatusFailed  = types.StatusFailed
 )
 
-// Re-export all core functions
-var (
-	Rename                     = api.Rename
-	Undo                       = api.Undo
-	Clean                      = api.Clean
-	DBGen                      = api.DBGen
-	Init                       = api.Init
-	DBPath                     = api.DBPath
-	DBList                     = api.DBList
-	DBInfo                     = api.DBInfo
-	DBRm                       = api.DBRm
-	CompilePattern             = api.CompilePattern
-	GenerateFilenameFromFields = api.GenerateFilenameFromFields
-	ExtractMALID               = fetcher.ExtractMALID
-)
+// Option is a functional option for configuring operations
+type Option func(*Options)
 
-// Version returns the version string of the library.
+// Options holds configuration for autotitle operations
+type Options struct {
+	DryRun   bool
+	NoBackup bool
+
+	Events types.EventHandler
+	Offset *int
+
+	// Init options
+	URL       string
+	FillerURL string
+	Separator string
+	Padding   int
+	Force     bool
+}
+
+// WithDryRun enables dry-run mode
+func WithDryRun() Option {
+	return func(o *Options) { o.DryRun = true }
+}
+
+// WithNoBackup disables backup creation
+func WithNoBackup() Option {
+	return func(o *Options) { o.NoBackup = true }
+}
+
+// WithEvents sets the event handler for progress updates
+func WithEvents(h types.EventHandler) Option {
+	return func(o *Options) { o.Events = h }
+}
+
+// WithOffset sets the episode number offset
+func WithOffset(offset int) Option {
+	return func(o *Options) { o.Offset = &offset }
+}
+
+// WithURL sets the provider URL for Init
+func WithURL(url string) Option {
+	return func(o *Options) { o.URL = url }
+}
+
+// WithFiller sets the filler list URL for Init
+func WithFiller(url string) Option {
+	return func(o *Options) { o.FillerURL = url }
+}
+
+// WithSeparator sets the separator for Init
+func WithSeparator(sep string) Option {
+	return func(o *Options) { o.Separator = sep }
+}
+
+// WithPadding sets the episode padding for Init
+func WithPadding(p int) Option {
+	return func(o *Options) { o.Padding = p }
+}
+
+// WithForce enables overwriting existing config for Init
+func WithForce() Option {
+	return func(o *Options) { o.Force = true }
+}
+
+// Rename renames media files in the specified directory
+func Rename(ctx context.Context, path string, opts ...Option) ([]types.RenameOperation, error) {
+	options := &Options{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	// Load config
+	cfg, err := config.Load(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve target
+	target, err := cfg.ResolveTarget(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get provider for URL
+	prov, err := provider.GetProviderForURL(target.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract ID
+	id, err := prov.ExtractID(target.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize database
+	db, err := database.NewRepository("")
+	if err != nil {
+		return nil, err
+	}
+
+	_, genErr := DBGen(ctx, target.URL, target.FillerURL, false)
+	if genErr != nil {
+		fmt.Printf("Warning: Failed to update database: %v\n", genErr)
+	}
+
+	// Load media from database
+	media, err := db.Load(ctx, prov.Name(), id)
+	if err != nil {
+		return nil, err
+	}
+
+	if media == nil {
+		if genErr != nil {
+			return nil, fmt.Errorf("failed to generate database: %w", genErr)
+		}
+		return nil, types.ErrDatabaseNotFound{Provider: prov.Name(), ID: id}
+	}
+
+	// Load global config
+	globalCfg, err := config.LoadGlobal()
+	if err != nil {
+		fmt.Printf("Warning: Failed to load global config: %v\n", err)
+		globalCfg = &config.GlobalConfig{
+			API:    types.APIConfig{RateLimit: 2.0, Timeout: 30},
+			Backup: types.BackupConfig{Enabled: true, DirName: "backups"},
+		}
+	}
+
+	// Create renamer
+	r := renamer.New(db, globalCfg.Backup, globalCfg.Formats)
+	if options.DryRun {
+		r.WithDryRun()
+	}
+	if options.NoBackup {
+		r.WithNoBackup()
+	}
+	if options.Events != nil {
+		r.WithEvents(options.Events)
+	}
+
+	if options.Offset != nil {
+		r.WithOffset(*options.Offset)
+	}
+
+	// Execute rename
+	return r.Execute(ctx, path, target, media)
+}
+
+// Init creates a new map file in the specified directory
+func Init(ctx context.Context, path string, opts ...Option) error {
+	options := &Options{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	// Load global config
+	globalCfg, _ := config.LoadGlobal()
+
+	mapFileName := config.Defaults.MapFile
+	formats := config.Defaults.Formats
+	if globalCfg != nil {
+		if globalCfg.MapFile != "" {
+			mapFileName = globalCfg.MapFile
+		}
+		if len(globalCfg.Formats) > 0 {
+			formats = globalCfg.Formats
+		}
+	}
+
+	mapPath := filepath.Join(absPath, mapFileName)
+	if _, err := os.Stat(mapPath); err == nil {
+		if !options.Force {
+			return fmt.Errorf("map file already exists: %s", mapPath)
+		}
+	}
+
+	// Try to detect pattern from files using global formats
+	var detectedPatterns []string
+	seenPatterns := make(map[string]bool)
+
+	entries, _ := os.ReadDir(absPath)
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(e.Name())
+		if len(ext) > 0 {
+			ext = ext[1:] // Remove leading dot
+		}
+		// Check if extension is in formats list
+		for _, f := range formats {
+			if ext == f {
+				p := matcher.GuessPattern(e.Name())
+				if p != "" && !seenPatterns[p] {
+					detectedPatterns = append(detectedPatterns, p)
+					seenPatterns[p] = true
+				}
+				break
+			}
+		}
+	}
+
+	url := options.URL
+	if url == "" {
+		url = "https://myanimelist.net/anime/XXXXX/Series_Name"
+	}
+	fillerURL := options.FillerURL
+	if fillerURL == "" {
+		fillerURL = "https://www.animefillerlist.com/shows/series-name"
+	}
+
+	offset := 0
+	if options.Offset != nil {
+		offset = *options.Offset
+	}
+
+	// Use global patterns if detection failed
+	var cfg *config.Config
+	if len(detectedPatterns) == 0 && globalCfg != nil && len(globalCfg.Patterns) > 0 {
+		// Use patterns from global config
+		cfg = &config.Config{
+			Targets: []config.Target{},
+		}
+
+		target := config.Target{
+			Path:      ".",
+			URL:       url,
+			FillerURL: fillerURL,
+			Patterns:  globalCfg.Patterns,
+		}
+
+		for i := range target.Patterns {
+			if offset != 0 {
+				target.Patterns[i].Output.Offset = offset
+			}
+			if options.Separator != "" {
+				target.Patterns[i].Output.Separator = options.Separator
+			}
+			if options.Padding > 0 {
+				target.Patterns[i].Output.Padding = options.Padding
+			}
+		}
+		cfg.Targets = append(cfg.Targets, target)
+
+	} else {
+		cfg = config.GenerateDefault(url, fillerURL, detectedPatterns, options.Separator, offset, options.Padding)
+	}
+
+	return config.Save(mapPath, cfg)
+}
+
+// DBGen generates a database from a provider URL
+// Returns true if database was generated, false if it already existed
+func DBGen(ctx context.Context, url string, fillerURL string, force bool) (bool, error) {
+	// Load global config to configure provider
+	globalCfg, _ := config.LoadGlobal()
+
+	// Get provider
+	prov, err := provider.GetProviderForURL(url)
+	if err != nil {
+		return false, err
+	}
+
+	// Configure provider with global settings
+	if globalCfg != nil {
+		prov.Configure(&globalCfg.API)
+	}
+
+	// Extract ID
+	id, err := prov.ExtractID(url)
+	if err != nil {
+		return false, err
+	}
+
+	// Initialize database repository
+	db, err := database.NewRepository("")
+	if err != nil {
+		return false, err
+	}
+
+	// Check if exists
+	if !force && db.Exists(prov.Name(), id) {
+		// Load existing data to check expiration
+		existing, err := db.Load(ctx, prov.Name(), id)
+		if err == nil && existing != nil {
+			// If finished airing, no new episodes will come
+			if existing.Status == "Finished Airing" {
+				return false, nil // Skip
+			}
+
+			// If next episode is known and in the future, wait
+			if existing.NextEpisodeAirDate != nil {
+				t, err := time.Parse(time.RFC3339, *existing.NextEpisodeAirDate)
+				if err == nil && t.After(time.Now()) {
+					return false, nil // Skip
+				}
+			}
+		} else {
+			return false, nil
+		}
+	}
+
+	// Fetch media
+	media, err := prov.FetchMedia(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	// Fetch filler if URL provided
+	if fillerURL != "" {
+		fillerSource, err := provider.GetFillerSourceForURL(fillerURL)
+		if err == nil {
+			slug, err := fillerSource.ExtractSlug(fillerURL)
+			if err == nil {
+				fillers, err := fillerSource.FetchFillers(ctx, slug)
+				if err == nil {
+					for i := range media.Episodes {
+						for _, f := range fillers {
+							if media.Episodes[i].Number == f {
+								media.Episodes[i].IsFiller = true
+								break
+							}
+						}
+					}
+					media.FillerSource = fillerSource.Name()
+				}
+			}
+		}
+	}
+
+	// Save to database
+	if err := db.Save(ctx, media); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// DBList lists all cached databases
+func DBList(ctx context.Context, providerFilter string) ([]types.MediaSummary, error) {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return nil, err
+	}
+	return db.List(ctx, providerFilter)
+}
+
+// DBInfo returns information about a specific database entry
+func DBInfo(ctx context.Context, prov, id string) (*types.Media, error) {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return nil, err
+	}
+	return db.Load(ctx, prov, id)
+}
+
+// DBDelete removes a database entry
+func DBDelete(ctx context.Context, prov, id string) error {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return err
+	}
+	return db.Delete(ctx, prov, id)
+}
+
+// DBDeleteAll removes all database entries
+func DBDeleteAll(ctx context.Context) error {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return err
+	}
+	return db.DeleteAll(ctx)
+}
+
+// DBPath returns the database directory path
+func DBPath() (string, error) {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return "", err
+	}
+	return db.Path(), nil
+}
+
+// Undo restores files from backup
+func Undo(ctx context.Context, path string) error {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return err
+	}
+	cacheRoot := filepath.Dir(db.Path())
+
+	globalCfg, _ := config.LoadGlobal()
+	dirName := backup.DefaultDirName
+	if globalCfg != nil && globalCfg.Backup.DirName != "" {
+		dirName = globalCfg.Backup.DirName
+	}
+
+	bm := backup.New(cacheRoot, dirName)
+	return bm.Restore(ctx, path)
+}
+
+// Clean removes the backup for a directory
+func Clean(ctx context.Context, path string) error {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return err
+	}
+	cacheRoot := filepath.Dir(db.Path())
+
+	globalCfg, _ := config.LoadGlobal()
+	dirName := backup.DefaultDirName
+	if globalCfg != nil && globalCfg.Backup.DirName != "" {
+		dirName = globalCfg.Backup.DirName
+	}
+
+	bm := backup.New(cacheRoot, dirName)
+	return bm.Clean(ctx, path)
+}
+
+// CleanAll removes all backups globally
+func CleanAll(ctx context.Context) error {
+	db, err := database.NewRepository("")
+	if err != nil {
+		return err
+	}
+	cacheRoot := filepath.Dir(db.Path())
+
+	globalCfg, _ := config.LoadGlobal()
+	dirName := backup.DefaultDirName
+	if globalCfg != nil && globalCfg.Backup.DirName != "" {
+		dirName = globalCfg.Backup.DirName
+	}
+
+	bm := backup.New(cacheRoot, dirName)
+	return bm.CleanAll(ctx)
+}
+
+// Version returns the version string
 func Version() string {
 	return version.String()
 }
+
+// Provider registry functions
+var (
+	GetProviderForURL     = provider.GetProviderForURL
+	GetFillerSourceForURL = provider.GetFillerSourceForURL
+	ListProviders         = provider.ListProviders
+	ListFillerSources     = provider.ListFillerSources
+)
+
+// Pattern utilities
+var (
+	CompilePattern             = matcher.Compile
+	GuessPattern               = matcher.GuessPattern
+	GenerateFilenameFromFields = matcher.GenerateFilenameFromFields
+)

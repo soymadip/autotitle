@@ -1,33 +1,43 @@
-# Autotitle Map File
+# Autotitle Map File Reference
 # Place this in your media directory as "_autotitle.yml"
 
 targets:
   - path: "."
     
-    # MAL and Anime Filler List URLs
-    mal_url: "https://myanimelist.net/anime/235/Meitantei_Conan"
-    afl_url: "https://www.animefillerlist.com/shows/detective-conan"
+    # Metadata Sources
+    url: "https://myanimelist.net/anime/235/Meitantei_Conan"
+    filler_url: "https://www.animefillerlist.com/shows/detective-conan"
     
-    # Patterns: match input files and define output format
+    # Patterns
     patterns:
       - input:
+          # Multiple input formats supported
           - "DC_remastered_{{EP_NUM}}_{{RES}}.{{EXT}}"
           - "Detective Conan - {{EP_NUM}}.{{EXT}}"
           - "[SubGroup] DC - {{EP_NUM}} [{{RES}}].{{EXT}}"
         
         output:
-          fields: ["DC", EP_NUM, FILLER, EP_NAME]  # Mix field names and literals
-          # separator: " - "  # Optional, defaults to " - "
-        
-        # Result examples:
-        # - "DC - 001 - [F] - Episode Title.mkv" (with filler)
-        # - "DC - 001 - Episode Title.mkv" (no filler - auto-skipped)
+          # --- Basic Configuration ---
+          # separator: " - "  # Default: " - "
+          # padding: 2        # Default: 2 (e.g. 01) or auto-detected from DB
+          # offset: 0         # Default: 0
 
-  # Multiple targets example (different directories/series)
-  # - path: "../OtherSeries"
-  #   mal_url: "https://myanimelist.net/anime/1234"
-  #   patterns:
-  #     - input: ["{{EP_NUM}}.{{EXT}}"]
-  #       output:
-  #         fields: [SERIES, EP_NUM, EP_NAME]
-  #         separator: "_"
+          # --- Output Fields & Formatting ---
+          fields: 
+            - "DC"        # Literal string (must be quoted)
+            - EP_NUM        # Keyword
+            - FILLER        # Shows "[F]" if filler, otherwise empty
+            - EP_NAME       # Episode Title
+          
+          # Result: "DC - 01 - [F] - Episode Title.mkv"
+
+      # --- Advanced Example (Separators, Glue, Offset) ---
+      - input:
+          - "Season 2 E{{EP_NUM}}.{{EXT}}"
+        output:
+          offset: 0         # Set offset (e.g. 12) to map generic season numbering to absolute DB numbering
+          separator: "_"    # Override default separator
+          
+          fields: ['"S2"', +, EP_NUM, EP_NAME] 
+          
+          # Result: "S201_-_Episode_Title.mkv"

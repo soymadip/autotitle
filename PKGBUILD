@@ -2,7 +2,7 @@
 pkgname=autotitle
 pkgver=1.0.1
 pkgrel=1
-pkgdesc="Automated anime episode renaming tool with MAL integration"
+pkgdesc="Automated media file renamer using online databases"
 arch=('x86_64')
 url="https://github.com/mydehq/autotitle"
 license=('GPL3')

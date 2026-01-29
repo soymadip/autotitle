@@ -1,344 +1,309 @@
+// Package renamer handles file renaming operations.
 package renamer
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
+	"github.com/mydehq/autotitle/internal/backup"
 	"github.com/mydehq/autotitle/internal/config"
-	"github.com/mydehq/autotitle/internal/database"
-	"github.com/mydehq/autotitle/internal/fetcher"
-	"github.com/mydehq/autotitle/internal/logger"
 	"github.com/mydehq/autotitle/internal/matcher"
+	"github.com/mydehq/autotitle/internal/types"
 )
 
-// Renamer orchestrates the file renaming process
+// Renamer handles file renaming operations
 type Renamer struct {
-	Config    *config.GlobalConfig
-	MapConfig *config.MapConfig
-	DB        *database.DB
-	DryRun    bool
-	NoBackup  bool
-	Verbose   bool
-	Quiet     bool
+	DB            types.DatabaseRepository
+	BackupManager types.BackupManager
+	Events        types.EventHandler
+	DryRun        bool
+	NoBackup      bool
+	BackupConfig  types.BackupConfig
+	Formats       []string
+	Offset        *int
 }
 
-type FileResult struct {
-	Original  string
-	NewName   string
-	Error     error
-	IsRenamed bool
+// New creates a new Renamer
+func New(db types.DatabaseRepository, backupConfig types.BackupConfig, formats []string) *Renamer {
+	dbPath := db.Path()
+	cacheRoot := filepath.Dir(dbPath)
+
+	bm := backup.New(cacheRoot, backupConfig.DirName)
+
+	if len(formats) == 0 {
+		formats = config.Defaults.Formats
+	}
+
+	return &Renamer{
+		DB:            db,
+		BackupManager: bm,
+		BackupConfig:  backupConfig,
+		Formats:       formats,
+	}
 }
 
-// Execute performs the renaming on the target directory
-func (r *Renamer) Execute(targetPath string) error {
-	absPath, err := filepath.Abs(targetPath)
-	if err != nil {
-		return err
-	}
-
-	targetConfig, err := r.MapConfig.ResolveTarget(".")
-	if err != nil {
-		return fmt.Errorf("failed to resolve target config: %w", err)
-	}
-
-	if targetConfig.MALURL == "" {
-		return fmt.Errorf("mal_url is missing in configuration")
-	}
-
-	malID := fetcher.ExtractMALID(targetConfig.MALURL)
-	if malID == 0 {
-		return fmt.Errorf("invalid mal_url in config: could not extract ID")
-	}
-
-	seriesSlug := fmt.Sprintf("%d", malID)
-
-	seriesData, err := r.DB.Load(seriesSlug)
-	if err != nil {
-		return fmt.Errorf("failed to load database for '%s' (ID: %d): %w", seriesSlug, malID, err)
-	}
-	if seriesData == nil {
-		return fmt.Errorf("database not found for '%s'. Run 'autotitle db gen' first.", seriesSlug)
-	}
-
-	files, err := r.scanFiles(absPath)
-	if err != nil {
-		return err
-	}
-
-	if len(files) == 0 {
-		logger.Warn("No video files found in %s", absPath)
-		return nil
-	}
-
-	var plans []FileResult
-
-	patterns := targetConfig.Patterns
-	if len(patterns) == 0 {
-		patterns = r.Config.Patterns
-	}
-
-	type PatternPair struct {
-		Matcher      *matcher.Pattern
-		OutputConfig config.OutputConfig
-	}
-
-	var pairs []PatternPair
-
-	for _, p := range patterns {
-		if len(p.Output.Fields) == 0 {
-			continue
-		}
-
-		for _, inputTmpl := range p.Input {
-			cp, err := matcher.Compile(inputTmpl)
-
-			if err != nil {
-				logger.Error("Pattern error: %v", err)
-				continue
-			}
-
-			pairs = append(pairs, PatternPair{
-				Matcher:      cp,
-				OutputConfig: p.GetOutputConfig(),
-			})
-		}
-	}
-
-	// Process files
-	for _, file := range files {
-		var bestMatch map[string]string
-		var matchedPair *PatternPair
-
-		matched := false
-		for i, pair := range pairs {
-			vars := pair.Matcher.Match(filepath.Base(file))
-			if vars != nil {
-				bestMatch = vars
-				matchedPair = &pairs[i]
-				matched = true
-				break
-			}
-		}
-
-		if !matched {
-			if r.Verbose {
-				logger.Info("Skipping non-matching file: %s", filepath.Base(file))
-			}
-			continue
-		}
-
-		epNumStr := bestMatch["EpNum"]
-		epNum, _ := parseEpNum(epNumStr) // Handles "01", "1" etc
-
-		epData, ok := seriesData.Episodes[epNum]
-		if !ok {
-			if r.Verbose {
-				logger.Warn("Episode %d not found in database for file %s", epNum, filepath.Base(file))
-			}
-		}
-
-		// Use anime title from database
-		seriesName := seriesData.Title
-		if seriesName == "" {
-			seriesName = "Unknown"
-		}
-
-		// Construct TemplateVars
-		tv := matcher.TemplateVars{
-			Series:   seriesName,
-			SeriesEn: seriesData.TitleEnglish,
-			SeriesJp: seriesData.TitleJapanese,
-			EpNum:    epNumStr,
-			EpName:   epData.Title,
-			Res:      bestMatch["Res"],
-			Ext:      bestMatch["Ext"],
-		}
-		if epData.Filler {
-			tv.Filler = "[F]"
-		}
-
-		newName := matcher.GenerateFilenameFromFields(
-			matchedPair.OutputConfig.Fields,
-			matchedPair.OutputConfig.Separator,
-			tv,
-		)
-
-		if newName == filepath.Base(file) {
-			continue
-		}
-
-		plans = append(plans, FileResult{
-			Original: file,
-			NewName:  filepath.Join(filepath.Dir(file), newName),
-		})
-	}
-
-	if len(plans) == 0 {
-		if !r.Quiet {
-			logger.Info("No files to rename.")
-		}
-		return nil
-	}
-
-	backupDir := filepath.Join(absPath, r.Config.Backup.DirName)
-	if !r.DryRun && !r.NoBackup {
-		if err := os.MkdirAll(backupDir, 0755); err != nil {
-			return fmt.Errorf("failed to create backup dir: %w", err)
-		}
-	}
-	undoLog := make(map[string]string)
-
-	for _, plan := range plans {
-		dest := plan.NewName
-
-		if r.DryRun {
-			if !r.Quiet {
-				relOld, _ := filepath.Rel(absPath, plan.Original)
-				relNew, _ := filepath.Rel(absPath, dest)
-				fmt.Printf("%s -> %s\n", relOld, relNew)
-			}
-			continue
-		}
-
-		if !r.NoBackup {
-			backupPath := filepath.Join(backupDir, filepath.Base(plan.Original))
-			if err := copyFile(plan.Original, backupPath); err != nil {
-				if !r.Quiet {
-					logger.Error("Backup failed for %s: %v", filepath.Base(plan.Original), err)
-				}
-				continue
-			}
-		}
-
-		if err := os.Rename(plan.Original, dest); err != nil {
-			if !r.Quiet {
-				logger.Error("Rename failed: %v", err)
-			}
-		} else {
-			undoLog[filepath.Base(plan.Original)] = dest
-		}
-	}
-
-	if !r.NoBackup && len(undoLog) > 0 {
-		logPath := filepath.Join(backupDir, "undo.json")
-		data, err := json.MarshalIndent(undoLog, "", "  ")
-		if err == nil {
-			_ = os.WriteFile(logPath, data, 0644)
-		}
-	}
-
-	if !r.Quiet {
-		logger.Success("Processed %d files.", len(plans))
-	}
-
-	return nil
+// WithEvents sets the event handler
+func (r *Renamer) WithEvents(h types.EventHandler) *Renamer {
+	r.Events = h
+	return r
 }
 
-// scanFiles returns list of supported video files
-func (r *Renamer) scanFiles(root string) ([]string, error) {
-	var files []string
-	formats := make(map[string]bool)
-	for _, f := range r.Config.Formats {
-		formats["."+strings.ToLower(f)] = true
+// WithDryRun enables dry-run mode
+func (r *Renamer) WithDryRun() *Renamer {
+	r.DryRun = true
+	return r
+}
+
+// WithNoBackup disables backup creation
+func (r *Renamer) WithNoBackup() *Renamer {
+	r.NoBackup = true
+	return r
+}
+
+// WithOffset sets the episode number offset
+func (r *Renamer) WithOffset(offset int) *Renamer {
+	r.Offset = &offset
+	return r
+}
+
+// Execute performs the rename operation for a target
+func (r *Renamer) Execute(ctx context.Context, dir string, target *config.Target, media *types.Media) ([]types.RenameOperation, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	entries, err := os.ReadDir(root)
+	patterns, err := r.compilePatterns(target)
 	if err != nil {
-		return nil, err
+		r.emit(types.Event{Type: types.EventWarning, Message: err.Error()})
+		if len(patterns) == 0 {
+			return nil, fmt.Errorf("no valid patterns found")
+		}
 	}
+
+	smartPadding := r.calculateSmartPadding(media)
+
+	var operations []types.RenameOperation
+	renameMappings := make(map[string]string)
 
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if formats[ext] {
-			files = append(files, filepath.Join(root, entry.Name()))
-		}
-	}
-	return files, nil
-}
 
-// Clean removes the backup directory
-func (r *Renamer) Clean(targetPath string) error {
-	backupDir := filepath.Join(targetPath, r.Config.Backup.DirName)
-	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
-		return fmt.Errorf("no backup directory found at %s", backupDir)
-	}
-	return os.RemoveAll(backupDir)
-}
-
-// Undo restores files from backup
-func (r *Renamer) Undo(targetPath string) error {
-	backupDir := filepath.Join(targetPath, r.Config.Backup.DirName)
-	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
-		return fmt.Errorf("no backup directory found to undo from")
-	}
-
-	entries, err := os.ReadDir(backupDir)
-	if err != nil {
-		return err
-	}
-
-	undoLog := make(map[string]string)
-	logPath := filepath.Join(backupDir, "undo.json")
-	if data, err := os.ReadFile(logPath); err == nil {
-		_ = json.Unmarshal(data, &undoLog)
-	}
-
-	count := 0
-	for _, entry := range entries {
-		if entry.IsDir() || entry.Name() == "undo.json" {
+		filename := entry.Name()
+		ext := filepath.Ext(filename)
+		if !r.isVideoFile(ext) {
 			continue
 		}
 
-		src := filepath.Join(backupDir, entry.Name())
-		dest := filepath.Join(targetPath, entry.Name())
+		var matchResult *matcher.MatchResult
+		var matchPattern *config.Pattern
 
-		if renamedFile, ok := undoLog[entry.Name()]; ok {
-			if err := os.Remove(renamedFile); err != nil {
-				logger.Warn("Failed to remove renamed file %s: %v", renamedFile, err)
+		patIdx := 0
+		found := false
+		for i := range target.Patterns {
+			for range target.Patterns[i].Input {
+				if patIdx < len(patterns) {
+					p := patterns[patIdx]
+					if result, ok := p.MatchTyped(filename); ok {
+						matchResult = result
+						matchPattern = &target.Patterns[i]
+						found = true
+						break
+					}
+				}
+				patIdx++
+			}
+			if found {
+				break
 			}
 		}
 
-		if err := os.Rename(src, dest); err != nil {
-			logger.Error("Failed to restore %s: %v", entry.Name(), err)
+		if matchResult == nil {
+			r.emit(types.Event{Type: types.EventWarning, Message: fmt.Sprintf("No pattern matched: %s", filename)})
+			continue
+		}
+
+		outputCfg := target.Patterns[0].Output
+
+		padding := outputCfg.Padding
+		if matchPattern != nil && matchPattern.Output.Padding != 0 {
+			padding = matchPattern.Output.Padding
+		}
+		if padding == 0 {
+			padding = smartPadding
+		}
+
+		// Calculate Offset
+		offset := MatchResultOffset(r.Offset, matchPattern)
+
+		// Get Episode
+		episodeNum := matchResult.EpisodeNum + offset
+		ep := media.GetEpisode(episodeNum)
+		if ep == nil {
+			msg := fmt.Sprintf("Episode %d not found in database", matchResult.EpisodeNum)
+			if offset != 0 {
+				msg = fmt.Sprintf("Episode %d (mapped to %d) not found in database", matchResult.EpisodeNum, episodeNum)
+			}
+			r.emit(types.Event{Type: types.EventWarning, Message: msg})
+			continue
+		}
+
+		// Build Variables
+		vars := matcher.TemplateVars{
+			Series:   media.GetTitle("SERIES"),
+			SeriesEn: media.GetTitle("SERIES_EN"),
+			SeriesJp: media.GetTitle("SERIES_JP"),
+			EpNum:    fmt.Sprintf("%d", ep.Number),
+			EpName:   ep.Title,
+			Res:      matchResult.Resolution,
+			Ext:      matchResult.Extension,
+		}
+		if ep.IsFiller {
+			vars.Filler = "[F]"
+		}
+
+		// Generate Filename
+		separator := outputCfg.Separator
+
+		newFilename, err := matcher.GenerateFilenameFromFields(outputCfg.Fields, separator, vars, padding)
+		if err != nil {
+			r.emit(types.Event{Type: types.EventError, Message: fmt.Sprintf("Failed to generate filename: %v", err)})
+			continue
+		}
+
+		sourcePath := filepath.Join(dir, filename)
+		targetPath := filepath.Join(dir, newFilename)
+
+		op := types.RenameOperation{
+			SourcePath: sourcePath,
+			TargetPath: targetPath,
+			Episode:    ep,
+			Status:     types.StatusPending,
+		}
+
+		if sourcePath == targetPath {
+			op.Status = types.StatusSkipped
+			r.emit(types.Event{Type: types.EventInfo, Message: fmt.Sprintf("Skipped (unchanged): %s", filename)})
 		} else {
-			count++
+			renameMappings[filename] = newFilename
+			if r.DryRun {
+				r.emit(types.Event{Type: types.EventInfo, Message: fmt.Sprintf("[DRY-RUN] %s → %s", filename, newFilename)})
+			}
+		}
+
+		operations = append(operations, op)
+	}
+
+	// Perform Backup
+	if err := r.performBackup(ctx, dir, renameMappings); err != nil {
+		return nil, err
+	}
+
+	// Perform Rename
+	r.performRenames(operations)
+
+	return operations, nil
+}
+
+func (r *Renamer) compilePatterns(target *config.Target) ([]*matcher.Pattern, error) {
+	var patterns []*matcher.Pattern
+	var errs []string
+
+	for _, p := range target.Patterns {
+		for _, input := range p.Input {
+			compiled, err := matcher.Compile(input)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("Invalid pattern '%s': %v", input, err))
+				continue
+			}
+			patterns = append(patterns, compiled)
 		}
 	}
 
-	os.Remove(logPath)
+	if len(errs) > 0 {
+		return patterns, fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return patterns, nil
+}
 
-	os.Remove(backupDir)
+func (r *Renamer) calculateSmartPadding(media *types.Media) int {
+	smartPadding := 2
+	maxEp := media.EpisodeCount
+	for _, e := range media.Episodes {
+		if e.Number > maxEp {
+			maxEp = e.Number
+		}
+	}
+	digits := len(fmt.Sprintf("%d", maxEp))
+	if digits > smartPadding {
+		smartPadding = digits
+	}
+	return smartPadding
+}
 
-	logger.Success("Restored %d files.", count)
+func MatchResultOffset(globalOffset *int, pattern *config.Pattern) int {
+	if globalOffset != nil {
+		return *globalOffset
+	}
+	if pattern != nil {
+		return pattern.Output.Offset
+	}
+	return 0
+}
+
+func (r *Renamer) performBackup(ctx context.Context, dir string, mappings map[string]string) error {
+	shouldBackup := !r.DryRun && !r.NoBackup && r.BackupConfig.Enabled
+	if shouldBackup && len(mappings) > 0 {
+		r.emit(types.Event{Type: types.EventInfo, Message: "Creating backup..."})
+		if err := r.BackupManager.Backup(ctx, dir, mappings); err != nil {
+			return fmt.Errorf("backup failed: %w", err)
+		}
+	}
 	return nil
 }
 
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
+func (r *Renamer) performRenames(ops []types.RenameOperation) {
+	for i, op := range ops {
+		if op.Status == types.StatusSkipped {
+			continue
+		}
+		if r.DryRun {
+			continue
+		}
 
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
+		if err := os.Rename(op.SourcePath, op.TargetPath); err != nil {
+			ops[i].Status = types.StatusFailed
+			ops[i].Error = err.Error()
+			r.emit(types.Event{Type: types.EventError, Message: fmt.Sprintf("Failed: %s: %v", filepath.Base(op.SourcePath), err)})
+		} else {
+			ops[i].Status = types.StatusSuccess
+			r.emit(types.Event{Type: types.EventSuccess, Message: fmt.Sprintf("Renamed: %s → %s", filepath.Base(op.SourcePath), filepath.Base(op.TargetPath))})
+		}
 	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
 }
 
-func parseEpNum(s string) (int, error) {
-	// Atoi handles "01" as 1
-	return strconv.Atoi(s)
+func (r *Renamer) emit(e types.Event) {
+	if r.Events != nil {
+		r.Events(e)
+	}
+}
+
+func (r *Renamer) isVideoFile(ext string) bool {
+	ext = strings.ToLower(ext)
+	if len(ext) > 0 && ext[0] == '.' {
+		ext = ext[1:] // Remove leading dot
+	}
+
+	for _, f := range r.Formats {
+		if ext == f {
+			return true
+		}
+	}
+
+	return false
 }
