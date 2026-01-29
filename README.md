@@ -2,8 +2,6 @@
 
 A CLI tool & Go library for automatically renaming media files (anime, TV shows) with proper titles and detecting filler episodes.
 
-📚 **[Full Documentation](https://mydehq.github.io/docs/autotitle)** — Detailed guides, configuration reference, and more.
-
 ## Features
 
 - 🎯 **Automatic Episode Renaming** - Pattern-based filename matching and generation
@@ -43,16 +41,12 @@ go get github.com/mydehq/autotitle
 cd /path/to/anime/videos
 
 # Initialize with URLs directly
-# Initialize with URLs, offset and separator
-autotitle init . -u "https://myanimelist.net/anime/XXXXX" --offset 10 --separator " - "
+autotitle init . -u "https://myanimelist.net/anime/XXXXX"
 
 # Or create template config to edit manually
 autotitle init .
 
 # Edit _autotitle.yml, preview & add changes
-
-# Preview changes (dry-run)
-autotitle --dry-run .
 
 # Perform rename
 autotitle .
@@ -78,37 +72,22 @@ targets:
           offset: 0 # Optional: Offset local episode numbers (e.g. 1 -> 11)
 ```
 
-## CLI Commands
-
-```bash
-autotitle <path>              # Rename files
-autotitle init [path]         # Create config
-autotitle undo <path>         # Restore backup
-autotitle clean <path>        # Remove backups
-
-autotitle db gen <mal_url>    # Generate database
-autotitle db list             # List cached databases
-autotitle db info <query>     # Show database info
-```
-
-| Flag          | Description                      |
-| ------------- | -------------------------------- |
-| `--dry-run`   | Preview changes without applying |
-| `--no-backup` | Skip backup creation             |
-| `--verbose`   | Show detailed output             |
-| `--force`     | Force overwrite/update           |
-| `--offset`    | Offset episode numbers (overrides config)        |
-| `--separator` | Separator for output fields (init command only)  |
-
 ## Documentation
 
-📚 **[Full Documentation](https://mydehq.github.io/docs/autotitle)** — Complete guides, configuration reference, and library API
+📚 **[Full Documentation](https://mydehq.github.io/docs/autotitle)** — Complete guides, commands, flags, configuration reference, and library API
 
 ## Data Sources
 
-- **[MyAnimeList](https://myanimelist.net/)** - Episode titles and metadata
-- **[AnimeFillerList](https://www.animefillerlist.com/)** - Filler episode detection
+Currently Below Data sources are implemented:
 
-## License
+### Episode Data
 
-GPL v3
+|                 Source                 | Type  |
+| :------------------------------------: | :---: |
+| [MyAnimeList](https://myanimelist.net) | Anime |
+
+### Filler Info
+
+|                       Source                        | Type  |
+| :-------------------------------------------------: | :---: |
+| [AnimeFillerList](https://www.animefillerlist.com/) | Anime |
