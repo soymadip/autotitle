@@ -2,8 +2,15 @@ name: Update Winget
 run-name: Update Winget (${{ github.event_name == 'release' && 'New Release' || 'Manual Trigger' }})
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Make GitHub Release"]
+    types:
+      - completed
+
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-winget.yml"
 
   workflow_dispatch:
     inputs:
@@ -11,6 +18,10 @@ on:
         description: 'Version to publish (e.g., 0.2.0)'
         required: true
         type: string
+
+concurrency:
+  group: update-winget
+  cancel-in-progress: true
 
 permissions:
   contents: write
