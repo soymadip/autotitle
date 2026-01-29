@@ -1,0 +1,142 @@
+package cli
+
+import (
+	"context"
+	"os"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
+	"github.com/mydehq/autotitle"
+	"github.com/spf13/cobra"
+)
+
+var (
+	flagDryRun   bool
+	flagNoBackup bool
+	flagVerbose  bool
+	flagQuiet    bool
+	flagOffset   int
+
+	logger *log.Logger
+)
+
+var RootCmd = &cobra.Command{
+	Use:   "autotitle <path>",
+	Short: "Rename media files with proper titles",
+	Args:  cobra.ExactArgs(1),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		setupLogger()
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		runRename(cmd.Context(), cmd, args[0])
+	},
+}
+
+func Execute() {
+	if err := RootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func init() {
+	RootCmd.Flags().BoolVarP(&flagDryRun, "dry-run", "d", false, "Preview changes without applying")
+	RootCmd.Flags().BoolVarP(&flagNoBackup, "no-backup", "n", false, "Skip backup creation")
+	RootCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Verbose output")
+	RootCmd.Flags().BoolVarP(&flagQuiet, "quiet", "q", false, "Quiet mode")
+	RootCmd.Flags().IntVarP(&flagOffset, "offset", "o", 0, "Episode number offset (db_num = local_num + offset)")
+
+	// Default logger setup (before flags parse)
+	logger = log.New(os.Stdout)
+	configureStyles()
+}
+
+func configureStyles() {
+	styles := log.DefaultStyles()
+
+	styles.Levels[log.DebugLevel] = lipgloss.NewStyle().
+		SetString("DEBUG").
+		Bold(true).
+		Foreground(lipgloss.Color("63"))
+
+	styles.Levels[log.InfoLevel] = lipgloss.NewStyle().
+		SetString("INFO ").
+		Bold(true).
+		Foreground(lipgloss.Color("86"))
+
+	styles.Levels[log.WarnLevel] = lipgloss.NewStyle().
+		SetString("WARN ").
+		Bold(true).
+		Foreground(lipgloss.Color("192"))
+
+	styles.Levels[log.ErrorLevel] = lipgloss.NewStyle().
+		SetString("ERROR").
+		Bold(true).
+		Foreground(lipgloss.Color("204"))
+
+	logger.SetStyles(styles)
+}
+
+func setupLogger() {
+	if flagQuiet {
+		logger.SetLevel(log.ErrorLevel)
+	} else if flagVerbose {
+		logger.SetLevel(log.DebugLevel)
+	} else {
+		logger.SetLevel(log.InfoLevel)
+	}
+}
+
+func runRename(ctx context.Context, cmd *cobra.Command, path string) {
+	var opts []autotitle.Option
+
+	if flagDryRun {
+		opts = append(opts, autotitle.WithDryRun())
+	}
+
+	if flagNoBackup {
+		opts = append(opts, autotitle.WithNoBackup())
+	}
+
+	if cmd.Flags().Changed("offset") {
+		opts = append(opts, autotitle.WithOffset(flagOffset))
+	}
+
+	if !flagQuiet {
+		opts = append(opts, autotitle.WithEvents(func(e autotitle.Event) {
+			switch e.Type {
+			case autotitle.EventSuccess:
+				logger.Info(e.Message)
+			case autotitle.EventWarning:
+				logger.Warn(e.Message)
+			case autotitle.EventError:
+				logger.Error(e.Message)
+			default:
+				logger.Debug(e.Message)
+			}
+		}))
+	}
+
+	ops, err := autotitle.Rename(ctx, path, opts...)
+	if err != nil {
+		logger.Error("Operation failed", "error", err)
+		os.Exit(1)
+	}
+
+	// Summary
+	var success, skipped, failed int
+
+	for _, op := range ops {
+		switch op.Status {
+		case autotitle.StatusSuccess:
+			success++
+		case autotitle.StatusSkipped:
+			skipped++
+		case autotitle.StatusFailed:
+			failed++
+		}
+	}
+
+	if !flagQuiet {
+		logger.Info("Summary", "renamed", success, "skipped", skipped, "failed", failed)
+	}
+}
