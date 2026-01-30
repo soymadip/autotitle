@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/mydehq/autotitle/internal/types"
@@ -202,12 +202,7 @@ func (r *Repository) List(ctx context.Context, provider string) ([]types.MediaSu
 			// Parse {ID}@{slug}.json
 			name := entry.Name()
 			name = name[:len(name)-5] // Remove .json
-			parts := strings.SplitN(name, "@", 2)
-			if len(parts) < 1 {
-				continue
-			}
-
-			id := parts[0]
+			id, _, _ := strings.Cut(name, "@")
 			if seen[id] {
 				continue
 			}
@@ -253,8 +248,8 @@ func (r *Repository) Search(ctx context.Context, query string) ([]types.MediaSum
 	}
 
 	// Sort by title
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Title < results[j].Title
+	slices.SortFunc(results, func(a, b types.MediaSummary) int {
+		return strings.Compare(a.Title, b.Title)
 	})
 
 	return results, nil

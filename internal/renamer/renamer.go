@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mydehq/autotitle/internal/backup"
@@ -234,11 +235,15 @@ func (r *Renamer) compilePatterns(target *config.Target) ([]*matcher.Pattern, er
 func (r *Renamer) calculatePadding(media *types.Media) int {
 	smartPadding := 2
 	maxEp := media.EpisodeCount
-	for _, e := range media.Episodes {
-		if e.Number > maxEp {
-			maxEp = e.Number
+
+	if len(media.Episodes) > 0 {
+		if max := slices.MaxFunc(media.Episodes, func(a, b types.Episode) int {
+			return a.Number - b.Number
+		}); max.Number > maxEp {
+			maxEp = max.Number
 		}
 	}
+
 	digits := len(fmt.Sprintf("%d", maxEp))
 	if digits > smartPadding {
 		smartPadding = digits
@@ -299,11 +304,5 @@ func (r *Renamer) isVideoFile(ext string) bool {
 		ext = ext[1:] // Remove leading dot
 	}
 
-	for _, f := range r.Formats {
-		if ext == f {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(r.Formats, ext)
 }
