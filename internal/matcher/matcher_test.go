@@ -1,10 +1,8 @@
-package matcher_test
+package matcher
 
 import (
 	"log"
 	"testing"
-
-	"github.com/mydehq/autotitle/internal/matcher"
 )
 
 func TestGuessPattern(t *testing.T) {
@@ -13,52 +11,19 @@ func TestGuessPattern(t *testing.T) {
 		filename string
 		want     string
 	}{
-		{
-			name:     "Standard Format with Brackets",
-			filename: "[Sub] Series - 01 [1080p].mkv",
-			want:     "[Sub] Series - {{EP_NUM}} [{{RES}}].{{EXT}}",
-		},
-		{
-			name:     "Space Separated",
-			filename: "Series 01.mp4",
-			want:     "Series {{EP_NUM}}.{{EXT}}",
-		},
-		{
-			name:     "Dot Separated",
-			filename: "Series.E01.mkv",
-			want:     "Series.E{{EP_NUM}}.{{EXT}}",
-		},
-		{
-			name:     "No Resolution",
-			filename: "Series - 01.avi",
-			want:     "Series - {{EP_NUM}}.{{EXT}}",
-		},
-		{
-			name:     "Multiple Brackets",
-			filename: "[Group][1080p] Series - 01.mkv",
-			want:     "[Group][{{RES}}] Series - {{EP_NUM}}.{{EXT}}",
-		},
-		{
-			name:     "SxxExx Format",
-			filename: "Series S01E02.mkv",
-			want:     "Series S01E{{EP_NUM}}.{{EXT}}",
-		},
-		{
-			name:     "Episode Keyword",
-			filename: "Series Episode 12.mkv",
-			want:     "Series Episode {{EP_NUM}}.{{EXT}}",
-		},
-		{
-			name:     "CRC masking",
-			filename: "[Group] Series - 01 [1A2B3C4D].mkv",
-			want:     "[Group] Series - {{EP_NUM}} [{{ANY}}].{{EXT}}",
-		},
+		{"Standard Format with Brackets", "[Sub] Series - 01 [1080p].mkv", "[{{ANY}}] Series - {{EP_NUM}} [{{RES}}].{{EXT}}"},
+		{"Space Separated", "Series - 01.mkv", "Series - {{EP_NUM}}.{{EXT}}"},
+		{"Dot Separated", "Series.01.mkv", "Series.{{EP_NUM}}.{{EXT}}"},
+		{"No Resolution", "[Sub] Series - 01.mkv", "[{{ANY}}] Series - {{EP_NUM}}.{{EXT}}"},
+		{"Multiple Brackets", "[Group][1080p] Series - 01.mkv", "[{{ANY}}][{{RES}}] Series - {{EP_NUM}}.{{EXT}}"},
+		{"SxxExx Format", "Series S01E01.mkv", "Series S01E{{EP_NUM}}.{{EXT}}"},
+		{"Episode Keyword", "Series Episode 01.mkv", "Series Episode {{EP_NUM}}.{{EXT}}"},
+		{"CRC masking", "[Group] Series - 01 [1A2B3C4D].mkv", "[{{ANY}}] Series - {{EP_NUM}} [{{ANY}}].{{EXT}}"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := matcher.GuessPattern(tt.filename)
-			if got != tt.want {
+			if got := GuessPattern(tt.filename); got != tt.want {
 				t.Errorf("GuessPattern(%q) = %q; want %q", tt.filename, got, tt.want)
 			}
 		})
@@ -66,96 +31,70 @@ func TestGuessPattern(t *testing.T) {
 }
 
 func TestGenerateFilenameFromFields(t *testing.T) {
+	vars := TemplateVars{
+		Series: "Test Series",
+		EpNum:  "1",
+		EpName: "Episode Title",
+		Res:    "1080p",
+		Ext:    "mkv",
+	}
+
 	tests := []struct {
 		name      string
 		fields    []string
 		separator string
-		vars      matcher.TemplateVars
+		padding   int
 		want      string
 	}{
 		{
-			name:      "All fields populated",
-			fields:    []string{"SERIES", "EP_NUM", "FILLER", "EP_NAME"},
-			separator: " - ",
-			vars: matcher.TemplateVars{
-				Series: "Test Series",
-				EpNum:  "1",
-				EpName: "The Beginning",
-				Filler: "[F]",
-				Ext:    "mkv",
-			},
-			want: "Test Series - 001 - [F] - The Beginning.mkv",
+			"All fields populated",
+			[]string{"SERIES", " - ", "EP_NUM", " - ", "EP_NAME"},
+			"",
+			3,
+			"Test Series - 001 - Episode Title.mkv",
 		},
 		{
-			name:      "Empty FILLER auto-skipped",
-			fields:    []string{"SERIES", "EP_NUM", "FILLER", "EP_NAME"},
-			separator: " - ",
-			vars: matcher.TemplateVars{
-				Series: "Test Series",
-				EpNum:  "1",
-				EpName: "The Beginning",
-				Filler: "", // Empty - should be skipped
-				Ext:    "mkv",
-			},
-			want: "Test Series - 001 - The Beginning.mkv",
+			"Empty FILLER auto-skipped",
+			[]string{"SERIES", " ", "FILLER", " - ", "EP_NUM"},
+			"",
+			2,
+			"Test Series  - 01.mkv",
 		},
 		{
-			name:      "Multiple empty fields skipped",
-			fields:    []string{"SERIES", "EP_NUM", "RES", "FILLER", "EP_NAME"},
-			separator: " - ",
-			vars: matcher.TemplateVars{
-				Series: "Test",
-				EpNum:  "1",
-				EpName: "Episode",
-				Filler: "", // Empty
-				Res:    "", // Empty
-				Ext:    "mkv",
-			},
-			want: "Test - 001 - Episode.mkv",
+			"Multiple empty fields skipped",
+			[]string{"SERIES", "FILLER", "RES", " - ", "EP_NUM"},
+			"",
+			3,
+			"Test Series1080p - 001.mkv",
 		},
 		{
-			name:      "With literal prefix",
-			fields:    []string{"\"DC\"", "EP_NUM", "FILLER", "EP_NAME"},
-			separator: " - ",
-			vars: matcher.TemplateVars{
-				EpNum:  "5",
-				EpName: "Title",
-				Filler: "[F]",
-				Ext:    "mkv",
-			},
-			want: "DC - 005 - [F] - Title.mkv",
+			"With literal prefix and glue",
+			[]string{"\"S1\"", "+", "EP_NUM", " - ", "EP_NAME"},
+			"",
+			2,
+			"S101 - Episode Title.mkv",
 		},
 		{
-			name:      "Different separator",
-			fields:    []string{"SERIES", "EP_NUM", "EP_NAME"},
-			separator: "_",
-			vars: matcher.TemplateVars{
-				Series: "Show",
-				EpNum:  "10",
-				EpName: "Test",
-				Ext:    "mp4",
-			},
-			want: "Show_010_Test.mp4",
+			"Different separator",
+			[]string{"SERIES", "EP_NUM"},
+			".",
+			2,
+			"Test Series.01.mkv",
 		},
 		{
-			name:      "Mixed literals and fields",
-			fields:    []string{"\"DC\"", "EP_NUM", "\"[Filler]\"", "EP_NAME"},
-			separator: " ",
-			vars: matcher.TemplateVars{
-				EpNum:  "3",
-				EpName: "Example",
-				Ext:    "mkv",
-			},
-			want: "DC 003 [Filler] Example.mkv",
+			"Mixed literals and fields",
+			[]string{"\"[Draft]\"", "SERIES", " - ", "EP_NUM"},
+			" ",
+			3,
+			"[Draft] Test Series  -  001.mkv",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := matcher.GenerateFilenameFromFields(tt.fields, tt.separator, tt.vars, 0)
+			got, err := GenerateFilenameFromFields(tt.fields, tt.separator, vars, tt.padding)
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
+				t.Fatalf("GenerateFilenameFromFields() error = %v", err)
 			}
 			if got != tt.want {
 				t.Errorf("GenerateFilenameFromFields() = %q; want %q", got, tt.want)
@@ -168,14 +107,14 @@ func TestCompileAndMatch(t *testing.T) {
 	template := "{{SERIES}} - {{EP_NUM}} [{{RES}}].{{EXT}}"
 	filename := "Test Anime - 01 [1080p].mkv"
 
-	p, err := matcher.Compile(template)
+	p, err := Compile(template)
 	if err != nil {
 		t.Fatalf("Compile() error = %v", err)
 	}
 
 	match := p.Match(filename)
 	if match == nil {
-		t.Fatal("Match() returned nil")
+		t.Fatalf("Match() returned nil. Regex: %s", p.String())
 	}
 
 	log.Printf("Match: %v", match)
@@ -198,24 +137,48 @@ func TestCompileAndMatch(t *testing.T) {
 }
 
 func TestNonGreedyMatch(t *testing.T) {
-	// Greedy matchers (.+) would capture "Subs] [v2" for {{ANY}}
 	template := "[{{ANY}}] {{SERIES}} - {{EP_NUM}}.{{EXT}}"
 	filename := "[Subs] [v2] My show - 01.mkv"
 
-	p, err := matcher.Compile(template)
+	p, err := Compile(template)
 	if err != nil {
 		t.Fatalf("Compile() error = %v", err)
 	}
 
 	match := p.Match(filename)
 	if match == nil {
-		t.Fatal("Match() returned nil")
+		t.Fatalf("Match() returned nil. Regex: %s", p.String())
 	}
 
-	if got := match["Any"]; got != "Subs" {
-		t.Errorf("Match[\"Any\"] = %q; want \"Subs\" (Greedy match detected!)", got)
+	if match["Any"] != "Subs" {
+		t.Errorf("Match[\"Any\"] = %q; want \"Subs\"", match["Any"])
 	}
 	if got := match["Series"]; got != "[v2] My show" {
 		t.Errorf("Match[\"Series\"] = %q; want \"[v2] My show\"", got)
+	}
+}
+
+func TestMultiplePlaceholders(t *testing.T) {
+	template := "[{{ANY}}] [{{ANY}}] {{SERIES}} - {{EP_NUM}}.{{EXT}}"
+	filename := "[Subs] [v2] My show - 01.mkv"
+
+	p, err := Compile(template)
+	if err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+
+	match := p.Match(filename)
+	if match == nil {
+		t.Fatalf("Match() returned nil. Regex: %s", p.String())
+	}
+
+	if match["Any_1"] != "Subs" {
+		t.Errorf("Any_1 = %q, want %q", match["Any_1"], "Subs")
+	}
+	if match["Any_2"] != "v2" {
+		t.Errorf("Any_2 = %q, want %q", match["Any_2"], "v2")
+	}
+	if match["Series"] != "My show" {
+		t.Errorf("Series = %q, want %q", match["Series"], "My show")
 	}
 }

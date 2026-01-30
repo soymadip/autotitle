@@ -7,11 +7,12 @@ import (
 )
 
 var (
-	reCRC    = regexp.MustCompile(`\[[A-Fa-f0-9]{8}\]`)
-	reRes    = regexp.MustCompile(`(?i)\b(\d{3,4}p|\d{3,4}x\d{3,4})\b`)
-	reSxxExx = regexp.MustCompile(`(?i)(S\d+E)(\d+)`)
-	rePrefix = regexp.MustCompile(`( - | Episode | Ep\.? )(\d+)`)
-	reNumber = regexp.MustCompile(`\d+`)
+	reCRC       = regexp.MustCompile(`\[[A-Fa-f0-9]{8}\]`)
+	reRes       = regexp.MustCompile(`(?i)\b(\d{3,4}p|\d{3,4}x\d{3,4})\b`)
+	reSxxExx    = regexp.MustCompile(`(?i)(S\d+E)(\d+)`)
+	rePrefix    = regexp.MustCompile(`( - | Episode | Ep\.? )(\d+)`)
+	reNumber    = regexp.MustCompile(`\d+`)
+	reBracketed = regexp.MustCompile(`\[([^\]]+)\]`)
 )
 
 // GuessPattern auto-detects a pattern from a filename
@@ -24,15 +25,49 @@ func GuessPattern(filename string) string {
 
 	pattern := base
 
-	// Mask CRCs: [8 hex chars] -> [{{ANY}}]
 	pattern = reCRC.ReplaceAllString(pattern, `[{{ANY}}]`)
 
-	// Identify Resolution: \d{3,4}p or \d+x\d+
 	if loc := reRes.FindStringIndex(pattern); loc != nil {
 		pattern = pattern[:loc[0]] + "{{RES}}" + pattern[loc[1]:]
 	}
 
-	// Heuristic A: SxxExx format
+	// Mask leading tags: [Group] [v2] -> [{{ANY}}] [{{ANY}}]
+	tagOffset := 0
+	for {
+		loc := reBracketed.FindStringSubmatchIndex(pattern[tagOffset:])
+		if loc == nil {
+			break
+		}
+
+		start, end := loc[0]+tagOffset, loc[1]+tagOffset
+		content := pattern[loc[2]+tagOffset : loc[3]+tagOffset]
+
+		// If it's not at the very start (ignoring leading metadata), stop
+		prefix := strings.TrimSpace(pattern[:start])
+		if prefix != "" {
+			// Check if prefix is entirely made of {{ANY}} or {{RES}} blocks
+			isAgnostic := true
+			for _, part := range strings.Fields(prefix) {
+				if part != "[{{ANY}}]" && part != "[{{RES}}]" {
+					isAgnostic = false
+					break
+				}
+			}
+			if !isAgnostic {
+				break
+			}
+		}
+		if content == "{{ANY}}" || content == "{{RES}}" {
+			tagOffset = end
+			continue
+		}
+
+		// Replace tag content with {{ANY}}
+		pattern = pattern[:start+1] + "{{ANY}}" + pattern[end-1:]
+		tagOffset = start + len("[{{ANY}}]")
+	}
+
+	// SxxExx format
 	if startEnd := reSxxExx.FindStringSubmatchIndex(pattern); startEnd != nil {
 		prefixEnd := startEnd[3]
 		numEnd := startEnd[5]
@@ -40,7 +75,7 @@ func GuessPattern(filename string) string {
 		goto Finalize
 	}
 
-	// Heuristic B: Prefix patterns like " - 01" or " Episode 01"
+	// Prefix patterns like " - 01" or " Episode 01"
 	{
 		if startEnd := rePrefix.FindStringSubmatchIndex(pattern); startEnd != nil {
 			numStart, numEnd := startEnd[4], startEnd[5]
@@ -49,7 +84,7 @@ func GuessPattern(filename string) string {
 		}
 	}
 
-	// Heuristic C: Find last number, filtering out version/codec/year numbers
+	// Find last number, filtering out version/codec/year numbers
 	{
 		matches := reNumber.FindAllStringIndex(pattern, -1)
 

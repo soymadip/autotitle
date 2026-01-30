@@ -64,7 +64,6 @@ func GetDefaults() types.GlobalConfig {
 	return defaults.Clone()
 }
 
-
 // Load loads configuration from a directory
 func Load(dir string) (*types.Config, error) {
 	// Try to get map file name from global config

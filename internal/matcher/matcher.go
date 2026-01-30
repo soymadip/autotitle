@@ -21,6 +21,20 @@ const (
 	PlaceholderAny      = "{{ANY}}"
 )
 
+var (
+	// placeholderRegexMap maps placeholder base names to their regex definitions
+	placeholderRegexMap = map[string]string{
+		"SERIES":    ".+?",
+		"SERIES_EN": ".+?",
+		"SERIES_JP": ".+?",
+		"EP_NUM":    `\d+`,
+		"EP_NAME":   ".+?",
+		"FILLER":    ".*?",
+		"RES":       `\d{3,4}p|\d{3,4}x\d{3,4}`,
+		"ANY":       ".*?",
+	}
+)
+
 type TemplateVars struct {
 	Series   string
 	SeriesEn string
@@ -37,7 +51,6 @@ type MatchResult struct {
 	EpisodeNum int
 	Resolution string
 	Extension  string
-	// Raw map[string]string
 }
 
 type Pattern struct {
@@ -47,34 +60,83 @@ type Pattern struct {
 	idxRes   int
 }
 
-// Compile compiles a template string into a regex pattern
+func (p *Pattern) String() string {
+	return p.regex.String()
+}
+
+// Compile compiles a template string into a regex pattern.
+// Supports multiple occurrences of the same placeholder by generating
+// unique named capture groups (e.g., Any_1, Any_2).
 func Compile(template string) (*Pattern, error) {
 	templateBase := strings.ReplaceAll(template, "."+PlaceholderExt, "")
 	templateBase = strings.ReplaceAll(templateBase, PlaceholderExt, "")
 
 	regexStr := regexp.QuoteMeta(templateBase)
 
-	// Replace placeholders with named capture groups
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderSeries), "(?P<Series>.+?)")
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderEpNum), "(?P<EpNum>\\d+)")
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderEpName), "(?P<EpName>.+?)")
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderFiller), "(?P<Filler>.*?)")
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderRes), "(?P<Res>\\d{3,4}p|\\d{3,4}x\\d{3,4})")
-	regexStr = strings.ReplaceAll(regexStr, regexp.QuoteMeta(PlaceholderAny), "(?P<Any>.*?)")
+	// Replace placeholders in a single pass using unique group names.
+	rePlaceholderFinder := regexp.MustCompile(`\\{\\{([A-Z_]+)\\}\\}`)
 
-	regexStr = "^" + regexStr + "$"
+	placeholderCounts := make(map[string]int)
 
-	re, err := regexp.Compile(regexStr)
+	allMatches := rePlaceholderFinder.FindAllStringSubmatch(regexStr, -1)
+	totals := make(map[string]int)
+	for _, m := range allMatches {
+		totals[m[1]]++
+	}
+
+	resultRegex := rePlaceholderFinder.ReplaceAllStringFunc(regexStr, func(m string) string {
+		match := rePlaceholderFinder.FindStringSubmatch(m)
+		baseName := match[1]
+		placeholderRegex, ok := placeholderRegexMap[baseName]
+		if !ok {
+			// Unknown placeholder, treat as literal
+			return m
+		}
+
+		placeholderCounts[baseName]++
+		count := placeholderCounts[baseName]
+
+		groupName := formatGroupName(baseName)
+
+		// Only add suffix if there are multiple occurrences of this specific placeholder
+		if totals[baseName] > 1 {
+			groupName = fmt.Sprintf("%s_%d", groupName, count)
+		}
+
+		return fmt.Sprintf("(?P<%s>%s)", groupName, placeholderRegex)
+	})
+
+	resultRegex = "^" + resultRegex + "$"
+
+	re, err := regexp.Compile(resultRegex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile pattern %q: %w", template, err)
+		return nil, fmt.Errorf("failed to compile pattern %q: %w (regex: %s)", template, err, resultRegex)
 	}
 
 	return &Pattern{
 		raw:      template,
 		regex:    re,
-		idxEpNum: re.SubexpIndex("EpNum"),
-		idxRes:   re.SubexpIndex("Res"),
+		idxEpNum: getFirstSubexpIndex(re, "EpNum"),
+		idxRes:   getFirstSubexpIndex(re, "Res"),
 	}, nil
+}
+
+func formatGroupName(baseName string) string {
+	parts := strings.Split(baseName, "_")
+	var groupName string
+	for _, p := range parts {
+		if len(p) > 0 {
+			groupName += strings.ToUpper(p[:1]) + strings.ToLower(p[1:])
+		}
+	}
+	return groupName
+}
+
+func getFirstSubexpIndex(re *regexp.Regexp, baseName string) int {
+	if idx := re.SubexpIndex(baseName); idx >= 0 {
+		return idx
+	}
+	return re.SubexpIndex(baseName + "_1")
 }
 
 // Match attempts to match a filename against the compiled pattern
@@ -99,7 +161,6 @@ func (p *Pattern) Match(filename string) map[string]string {
 	}
 
 	result["Ext"] = strings.TrimPrefix(ext, ".")
-
 	return result
 }
 
@@ -138,8 +199,6 @@ func (p *Pattern) MatchTyped(filename string) (*MatchResult, bool) {
 }
 
 // GenerateFilenameFromFields builds filename from field list
-// Fields can be field names (uppercase) or literal strings (must be quoted)
-// Returns error if an unknown field is encountered
 func GenerateFilenameFromFields(fields []string, separator string, vars TemplateVars, padding int) (string, error) {
 	if padding <= 0 {
 		padding = 3
@@ -162,20 +221,17 @@ func GenerateFilenameFromFields(fields []string, separator string, vars Template
 			return "", err
 		}
 
-		// Skip empty values
 		if value == "" {
 			continue
 		}
 
-		if !first {
-			if !suppressNextSep {
-				builder.WriteString(separator)
-			}
+		if !first && !suppressNextSep {
+			builder.WriteString(separator)
 		}
 
 		builder.WriteString(value)
 		first = false
-		suppressNextSep = false // Reset after consuming
+		suppressNextSep = false
 	}
 
 	builder.WriteString(".")
@@ -202,13 +258,11 @@ func resolveField(field string, vars TemplateVars, padding int) (string, error) 
 		return vars.Res, nil
 	}
 
-	// Not a keyword.
 	// Check if it's explicitly quoted (to allow using "SERIES" as a literal)
 	if len(field) >= 2 && field[0] == '"' && field[len(field)-1] == '"' {
 		return field[1 : len(field)-1], nil
 	}
 
-	// Otherwise, treat as an implicit literal
 	return field, nil
 }
 
@@ -223,6 +277,5 @@ func padNumber(s string, width int) string {
 		return s
 	}
 
-	needed := width - len(s)
-	return strings.Repeat("0", needed) + s
+	return strings.Repeat("0", width-len(s)) + s
 }
