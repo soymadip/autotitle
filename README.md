@@ -24,6 +24,9 @@ sudo pacman -S autotitle
 # Or from AUR
 paru -S autotitle
 
+# In Windows, from winget
+winget install mydehq.autotitle
+
 # Or build manually
 git clone https://github.com/mydehq/autotitle.git && cd autotitle
 make install
