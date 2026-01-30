@@ -6,6 +6,7 @@ autotitle
 
 # Testing
 test/
+_autotitle.y*
 
 # Backup directories
 _backup/
