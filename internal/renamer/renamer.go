@@ -35,7 +35,7 @@ func New(db types.DatabaseRepository, backupConfig types.BackupConfig, formats [
 	bm := backup.New(cacheRoot, backupConfig.DirName)
 
 	if len(formats) == 0 {
-		formats = config.Defaults.Formats
+		formats = config.GetDefaults().Formats
 	}
 
 	return &Renamer{
@@ -90,6 +90,8 @@ func (r *Renamer) Execute(ctx context.Context, dir string, target *types.Target,
 	var operations []types.RenameOperation
 	renameMappings := make(map[string]string)
 
+	usedTargets := make(map[string]bool)
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -129,12 +131,9 @@ func (r *Renamer) Execute(ctx context.Context, dir string, target *types.Target,
 			continue
 		}
 
-		outputCfg := target.Patterns[0].Output
+		outputCfg := matchPattern.Output
 
 		padding := outputCfg.Padding
-		if matchPattern != nil && matchPattern.Output.Padding != 0 {
-			padding = matchPattern.Output.Padding
-		}
 		if padding == 0 {
 			padding = smartPadding
 		}
@@ -179,6 +178,13 @@ func (r *Renamer) Execute(ctx context.Context, dir string, target *types.Target,
 
 		sourcePath := filepath.Join(dir, filename)
 		targetPath := filepath.Join(dir, newFilename)
+
+		// Check for target collision
+		if usedTargets[targetPath] {
+			r.emit(types.Event{Type: types.EventError, Message: fmt.Sprintf("Collision detected: %s and another file both want to rename to %s", filename, newFilename)})
+			continue
+		}
+		usedTargets[targetPath] = true
 
 		op := types.RenameOperation{
 			SourcePath: sourcePath,

@@ -2,7 +2,7 @@ package util
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -48,26 +48,6 @@ func ParseRanges(s string) ([]int, error) {
 		}
 	}
 
-	sort.Ints(results)
-	results = removeDuplicates(results)
-
-	return results, nil
-}
-
-// removeDuplicates removes duplicate integers from a sorted slice
-func removeDuplicates(nums []int) []int {
-	if len(nums) == 0 {
-		return nums
-	}
-
-	var result []int
-	result = append(result, nums[0])
-
-	for i := 1; i < len(nums); i++ {
-		if nums[i] != nums[i-1] {
-			result = append(result, nums[i])
-		}
-	}
-
-	return result
+	slices.Sort(results)
+	return slices.Compact(results), nil
 }

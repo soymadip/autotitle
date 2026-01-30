@@ -103,18 +103,20 @@ func (m *Manager) Restore(ctx context.Context, dir string) error {
 	}
 
 	for oldName, newName := range mappings {
-
-		// Remove renamed file
-		renamedPath := filepath.Join(absDir, newName)
-		if _, err := os.Stat(renamedPath); err == nil {
-			os.Remove(renamedPath)
-		}
-
-		// Restore original
 		src := filepath.Join(backupPath, oldName)
 		dst := filepath.Join(absDir, oldName)
+		renamedPath := filepath.Join(absDir, newName)
+
+		// Restore original first
 		if err := copyFile(src, dst); err != nil {
 			return fmt.Errorf("failed to restore file %s: %w", oldName, err)
+		}
+
+		// Only remove renamed file IF it's different from the original
+		if oldName != newName {
+			if _, err := os.Stat(renamedPath); err == nil {
+				os.Remove(renamedPath)
+			}
 		}
 	}
 
