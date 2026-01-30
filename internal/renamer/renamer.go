@@ -84,7 +84,7 @@ func (r *Renamer) Execute(ctx context.Context, dir string, target *config.Target
 		}
 	}
 
-	smartPadding := r.calculateSmartPadding(media)
+	smartPadding := r.calculatePadding(media)
 
 	var operations []types.RenameOperation
 	renameMappings := make(map[string]string)
@@ -231,7 +231,7 @@ func (r *Renamer) compilePatterns(target *config.Target) ([]*matcher.Pattern, er
 	return patterns, nil
 }
 
-func (r *Renamer) calculateSmartPadding(media *types.Media) int {
+func (r *Renamer) calculatePadding(media *types.Media) int {
 	smartPadding := 2
 	maxEp := media.EpisodeCount
 	for _, e := range media.Episodes {
