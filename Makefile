@@ -45,7 +45,11 @@ release-all:
 	@echo "Building cross-platform releases..."
 	@mkdir -p $(BIN_DIR)
 	GOOS=linux   GOARCH=amd64 $(GO) build -ldflags "$(LDFLAGS_RELEASE)" -o $(BIN_DIR)/$(BINARY_NAME)-linux-amd64       ./cmd/autotitle
+	GOOS=linux   GOARCH=arm64 $(GO) build -ldflags "$(LDFLAGS_RELEASE)" -o $(BIN_DIR)/$(BINARY_NAME)-linux-arm64       ./cmd/autotitle
+
 	GOOS=darwin  GOARCH=amd64 $(GO) build -ldflags "$(LDFLAGS_RELEASE)" -o $(BIN_DIR)/$(BINARY_NAME)-darwin-amd64      ./cmd/autotitle
+	GOOS=darwin  GOARCH=arm64 $(GO) build -ldflags "$(LDFLAGS_RELEASE)" -o $(BIN_DIR)/$(BINARY_NAME)-darwin-arm64      ./cmd/autotitle
+
 	GOOS=windows GOARCH=amd64 $(GO) build -ldflags "$(LDFLAGS_RELEASE)" -o $(BIN_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/autotitle
 
 
@@ -88,7 +92,7 @@ help:
 	@echo "Targets:"
 	@echo "  build       Build development binary"
 	@echo "  release     Build optimized production binary"
-	@echo "  release-all Build optimized binaries for Linux, Windows, macOS (amd64 only)"
+	@echo "  release-all Build optimized binaries for Linux, macOS (amd64/arm64) & Windows (amd64)"
 	@echo "  install     Install optimized binary to GOPATH/bin"
 	@echo "  test        Run tests"
 	@echo "  clean       Remove build artifacts"
