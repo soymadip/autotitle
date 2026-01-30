@@ -71,7 +71,7 @@ func (r *Renamer) WithOffset(offset int) *Renamer {
 }
 
 // Execute performs the rename operation for a target
-func (r *Renamer) Execute(ctx context.Context, dir string, target *config.Target, media *types.Media) ([]types.RenameOperation, error) {
+func (r *Renamer) Execute(ctx context.Context, dir string, target *types.Target, media *types.Media) ([]types.RenameOperation, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
@@ -102,7 +102,7 @@ func (r *Renamer) Execute(ctx context.Context, dir string, target *config.Target
 		}
 
 		var matchResult *matcher.MatchResult
-		var matchPattern *config.Pattern
+		var matchPattern *types.Pattern
 
 		patIdx := 0
 		found := false
@@ -211,7 +211,7 @@ func (r *Renamer) Execute(ctx context.Context, dir string, target *config.Target
 	return operations, nil
 }
 
-func (r *Renamer) compilePatterns(target *config.Target) ([]*matcher.Pattern, error) {
+func (r *Renamer) compilePatterns(target *types.Target) ([]*matcher.Pattern, error) {
 	var patterns []*matcher.Pattern
 	var errs []string
 
@@ -251,7 +251,7 @@ func (r *Renamer) calculatePadding(media *types.Media) int {
 	return smartPadding
 }
 
-func MatchResultOffset(globalOffset *int, pattern *config.Pattern) int {
+func MatchResultOffset(globalOffset *int, pattern *types.Pattern) int {
 	if globalOffset != nil {
 		return *globalOffset
 	}

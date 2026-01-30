@@ -104,28 +104,3 @@ type ConfigRepository interface {
 	// Validate validates configuration
 	Validate(cfg *Config) error
 }
-
-// Config represents the autotitle configuration file
-type Config struct {
-	Targets []Target `yaml:"targets"`
-}
-
-// Target represents a rename target in the configuration
-type Target struct {
-	Path      string    `yaml:"path"`
-	URL       string    `yaml:"url"`
-	FillerURL string    `yaml:"filler_url,omitempty"`
-	Patterns  []Pattern `yaml:"patterns"`
-}
-
-// Pattern represents input/output pattern configuration
-type Pattern struct {
-	Input  []string     `yaml:"input"`
-	Output OutputConfig `yaml:"output"`
-}
-
-// OutputConfig represents output format configuration
-type OutputConfig struct {
-	Fields    []string `yaml:"fields"`
-	Separator string   `yaml:"separator,omitempty"`
-}

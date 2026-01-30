@@ -11,51 +11,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the autotitle configuration file
-type Config struct {
-	Targets []Target `yaml:"targets"`
-	BaseDir string   `yaml:"-"`
-}
-
-// Target represents a rename target in the configuration
-type Target struct {
-	Path      string    `yaml:"path"`
-	URL       string    `yaml:"url"`                  // Provider URL (MAL, TMDB, etc.)
-	FillerURL string    `yaml:"filler_url,omitempty"` // Optional filler source URL
-	Patterns  []Pattern `yaml:"patterns"`
-}
-
-// Pattern represents input/output pattern configuration
-type Pattern struct {
-	Input  []string     `yaml:"input"`
-	Output OutputConfig `yaml:"output"`
-}
-
-// OutputConfig represents output format configuration
-type OutputConfig struct {
-	Fields    []string `yaml:"fields,flow"`
-	Separator string   `yaml:"separator,omitempty"`
-	Offset    int      `yaml:"offset,omitempty"`  // Episode number offset
-	Padding   int      `yaml:"padding,omitempty"` // Episode number padding (e.g. 2 -> 01, 3 -> 001)
-}
-
-// GlobalConfig represents the global configuration file (~/.config/autotitle/config.yml)
-type GlobalConfig struct {
-	MapFile  string             `yaml:"map_file"`
-	Patterns []Pattern          `yaml:"patterns"`
-	Formats  []string           `yaml:"formats"`
-	API      types.APIConfig    `yaml:"api"`
-	Backup   types.BackupConfig `yaml:"backup"`
-}
+// Type aliases for easier usage
+type (
+	Config       = types.Config
+	Target       = types.Target
+	Pattern      = types.Pattern
+	OutputConfig = types.OutputConfig
+	GlobalConfig = types.GlobalConfig
+)
 
 // Defaults holds the default global configuration values
-var Defaults = GlobalConfig{
+var Defaults = types.GlobalConfig{
 	MapFile: "_autotitle.yml",
 	Formats: []string{"mkv", "mp4", "avi", "webm", "m4v", "ts", "flv"},
-	Patterns: []Pattern{
+	Patterns: []types.Pattern{
 		{
 			Input: []string{"{{EP_NUM}}.{{EXT}}", "Episode {{EP_NUM}}.{{EXT}}", "E{{EP_NUM}}.{{EXT}}"},
-			Output: OutputConfig{
+			Output: types.OutputConfig{
 				Fields:    []string{"E", "+", "EP_NUM", "FILLER", "-", "EP_NAME"},
 				Separator: " ",
 				Offset:    0,
@@ -76,7 +48,7 @@ var Defaults = GlobalConfig{
 const GlobalConfigFileName = "config.yml"
 
 // Load loads configuration from a directory
-func Load(dir string) (*Config, error) {
+func Load(dir string) (*types.Config, error) {
 	// Try to get map file name from global config
 	mapFileName := Defaults.MapFile
 	if globalCfg, err := LoadGlobal(); err == nil && globalCfg.MapFile != "" {
@@ -111,13 +83,13 @@ func swapYAMLExtension(path string) string {
 }
 
 // LoadFile loads configuration from a specific file path
-func LoadFile(path string) (*Config, error) {
+func LoadFile(path string) (*types.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read map file: %w", err)
 	}
 
-	var cfg Config
+	var cfg types.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse map file: %w", err)
 	}
@@ -136,7 +108,7 @@ func LoadFile(path string) (*Config, error) {
 }
 
 // LoadGlobal loads the global configuration
-func LoadGlobal() (*GlobalConfig, error) {
+func LoadGlobal() (*types.GlobalConfig, error) {
 	// Paths to check in order
 	paths := []string{}
 
@@ -160,7 +132,7 @@ func LoadGlobal() (*GlobalConfig, error) {
 	}
 
 	// Default values
-	cfg := &GlobalConfig{}
+	cfg := &types.GlobalConfig{}
 	*cfg = Defaults
 
 	if configPath == "" {
@@ -180,7 +152,7 @@ func LoadGlobal() (*GlobalConfig, error) {
 }
 
 // Save saves configuration to a file
-func Save(path string, cfg *Config) error {
+func Save(path string, cfg *types.Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
@@ -194,7 +166,7 @@ func Save(path string, cfg *Config) error {
 }
 
 // Validate validates the configuration
-func Validate(cfg *Config) error {
+func Validate(cfg *types.Config) error {
 	if len(cfg.Targets) == 0 {
 		return fmt.Errorf("config must have at least one target")
 	}
@@ -223,38 +195,8 @@ func Validate(cfg *Config) error {
 	return nil
 }
 
-// ResolveTarget finds the target configuration for a given path
-func (c *Config) ResolveTarget(path string) (*Target, error) {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve path: %w", err)
-	}
-
-	for i := range c.Targets {
-		targetPath := c.Targets[i].Path
-		if !filepath.IsAbs(targetPath) {
-			// Resolve relative to map file location
-			targetPath = filepath.Join(c.BaseDir, targetPath)
-		}
-
-		// Check if paths resolve to the same location
-		tAbs, err := filepath.Abs(targetPath)
-		if err == nil && tAbs == absPath {
-			return &c.Targets[i], nil
-		}
-
-		// Also support "." exact match logic if targetPath resolution is funky
-		if targetPath == "." && absPath == c.BaseDir {
-			return &c.Targets[i], nil
-		}
-	}
-
-	return nil, fmt.Errorf("no target found for path: %s", path)
-}
-
 // GenerateDefault creates a default config with auto-detected pattern
-func GenerateDefault(url, fillerURL string, inputPatterns []string, separator string, offset, padding int) *Config {
-	defaultPattern := Defaults.Patterns[0]
+func GenerateDefault(url, fillerURL string, inputPatterns []string, separator string, offset, padding int) *types.Config {
 
 	if len(inputPatterns) == 0 {
 		inputPatterns = defaultPattern.Input

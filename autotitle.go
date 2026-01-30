@@ -190,7 +190,7 @@ func Rename(ctx context.Context, path string, opts ...Option) ([]types.RenameOpe
 	globalCfg, err := config.LoadGlobal()
 	if err != nil {
 		fmt.Printf("Warning: Failed to load global config: %v\n", err)
-		globalCfg = &config.GlobalConfig{
+		globalCfg = &types.GlobalConfig{
 			API:    types.APIConfig{RateLimit: 2.0, Timeout: 30},
 			Backup: types.BackupConfig{Enabled: true, DirName: "backups"},
 		}
