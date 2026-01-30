@@ -52,5 +52,7 @@ jobs:
           identifier: mydehq.autotitle
           version: ${{ steps.version.outputs.ver }}
           release-tag: v${{ steps.version.outputs.ver }}
+          release-notes-url: https://github.com/mydehq/autotitle/releases/tag/v${{ steps.version.outputs.ver }}
           installers-regex: 'autotitle-windows-amd64\.exe$'
+          max-versions-to-keep: 4
           token: ${{ secrets.WINGET_TOKEN }}
