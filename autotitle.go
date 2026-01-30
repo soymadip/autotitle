@@ -247,6 +247,8 @@ func Init(ctx context.Context, path string, opts ...Option) error {
 		if !options.Force {
 			return fmt.Errorf("map file already exists: %s", mapPath)
 		}
+		// Warning when overriding
+		fmt.Printf("Warning: Overwriting existing map file: %s\n", mapPath)
 	}
 
 	// Try to detect pattern from files using global formats
@@ -272,31 +274,34 @@ func Init(ctx context.Context, path string, opts ...Option) error {
 		}
 	}
 
-	if len(detectedPatterns) == 0 && len(entries) == 0 && !options.Force {
-		return fmt.Errorf("no files found in directory")
+	if len(detectedPatterns) == 0 && len(entries) == 0 {
+		if !options.Force {
+			return fmt.Errorf("no files found in directory")
+		}
+		fmt.Println("Warning: No files found in directory. Use standard configuration.")
 	}
 
 	// Check if any media files were found
 	hasMedia := false
 	for _, e := range entries {
-
 		if e.IsDir() {
 			continue
 		}
-
 		ext := filepath.Ext(e.Name())
 		if len(ext) > 0 {
 			ext = ext[1:]
 		}
-
 		if slices.Contains(formats, ext) {
 			hasMedia = true
 			break
 		}
 	}
 
-	if !hasMedia && !options.Force {
-		return fmt.Errorf("no media files found in directory (use --force to initialize anyway)")
+	if !hasMedia && len(entries) > 0 {
+		if !options.Force {
+			return fmt.Errorf("no media files found in directory (use --force to initialize anyway)")
+		}
+		fmt.Println("Warning: No media files found. Use standard configuration.")
 	}
 
 	url := options.URL
