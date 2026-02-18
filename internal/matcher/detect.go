@@ -118,9 +118,52 @@ func GuessPattern(filename string) string {
 	}
 
 Finalize:
+	// Mask episode title if present after the episode number
+	pattern = maskTrailer(pattern)
 
 	if len(ext) > 0 {
 		return pattern + ".{{EXT}}"
+	}
+	return pattern
+}
+
+func maskTrailer(pattern string) string {
+	idx := strings.Index(pattern, "{{EP_NUM}}")
+	if idx == -1 {
+		return pattern
+	}
+
+	trailer := pattern[idx+len("{{EP_NUM}}"):]
+	if trailer == "" {
+		return pattern
+	}
+
+	// Check for common title separators
+	separators := []string{" - ", " — ", " : ", " | "}
+	for _, sep := range separators {
+		if sIdx := strings.Index(trailer, sep); sIdx != -1 {
+			// Found a separator. Check if there's significant content after it
+			// and before any remaining metadata like [{{RES}}] or [{{ANY}}]
+			remaining := trailer[sIdx+len(sep):]
+
+			// Find first metadata block [{{ANY}}] or [{{RES}}]
+			metaRe := regexp.MustCompile(`\[\{\{[A-Z_]+\}\}\]`)
+			m := metaRe.FindStringIndex(remaining)
+
+			if m == nil {
+				// No metadata, mask the whole remaining part if it's not empty
+				if strings.TrimSpace(remaining) != "" {
+					return pattern[:idx+len("{{EP_NUM}}")] + trailer[:sIdx] + sep + "{{ANY}}"
+				}
+			} else {
+				// Mask only up to the metadata block
+				titlePart := remaining[:m[0]]
+				if strings.TrimSpace(titlePart) != "" {
+					return pattern[:idx+len("{{EP_NUM}}")] + trailer[:sIdx] + sep + "{{ANY}} " + remaining[m[0]:]
+				}
+			}
+			break
+		}
 	}
 	return pattern
 }
