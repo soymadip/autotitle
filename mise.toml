@@ -1,0 +1,65 @@
+[tools]
+go = "1.26"
+golangci-lint = "latest"
+
+[env]
+_.path = "./bin"
+_.source = "scripts/version.sh"
+
+BINARY_NAME = "autotitle"
+BIN_DIR = "bin"
+
+[tasks.setup]
+description = "Setup development environment"
+run = "mise install && go mod tidy"
+
+[tasks.build]
+description = "Build development binary"
+sources = ["**/*.go", "go.mod", "go.sum"]
+outputs = ["{{env.BIN_DIR}}/{{env.BINARY_NAME}}"]
+run = "go build -ldflags \"$LDFLAGS_BASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}} ./cmd/autotitle"
+
+[tasks.release]
+description = "Build release binary (stripped, optimized)"
+depends = ["test"]
+run = "go build -ldflags \"$LDFLAGS_RELEASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}} ./cmd/autotitle"
+
+[tasks.release-all]
+description = "Build optimized binaries for Linux, macOS (amd64/arm64) & Windows (amd64)"
+depends = ["test"]
+run = """
+    mkdir -p {{env.BIN_DIR}}
+    # Linux
+    GOOS=linux GOARCH=amd64 go build -ldflags "{{env.LDFLAGS_RELEASE}}" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-amd64 ./cmd/autotitle
+    GOOS=linux GOARCH=arm64 go build -ldflags "{{env.LDFLAGS_RELEASE}}" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-arm64 ./cmd/autotitle
+    # macOS
+    GOOS=darwin GOARCH=amd64 go build -ldflags "{{env.LDFLAGS_RELEASE}}" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-darwin-amd64 ./cmd/autotitle
+    GOOS=darwin GOARCH=arm64 go build -ldflags "{{env.LDFLAGS_RELEASE}}" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-darwin-arm64 ./cmd/autotitle
+    # Windows
+    GOOS=windows GOARCH=amd64 go build -ldflags "{{env.LDFLAGS_RELEASE}}" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-windows-amd64.exe ./cmd/autotitle
+"""
+
+[tasks.install]
+description = "Install optimized binary to GOPATH/bin"
+depends = ["test"]
+run = "go install -ldflags \"{{env.LDFLAGS_RELEASE}}\" ./cmd/autotitle"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "rm -rf {{env.BIN_DIR}} && echo \"Cleaning...\""
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.fmt]
+description = "Format code"
+run = "go fmt ./..."
+
+[tasks.lint]
+description = "Run linter"
+run = "golangci-lint run ./..."
+
+[tasks.ci]
+description = "Run all CI tasks (lint, test, build)"
+depends = ["lint", "test", "build"]
