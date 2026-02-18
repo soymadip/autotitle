@@ -2,9 +2,14 @@
 go = "1.26"
 golangci-lint = "latest"
 
+[shell_alias]
+cz = "cz --config $CZ_CONFIG"
+
 [env]
 _.path = "./bin"
 _.source = "scripts/version.sh"
+
+CZ_CONFIG = "src/cz/cz.yaml"
 
 BINARY_NAME = "autotitle"
 BIN_DIR = "bin"
