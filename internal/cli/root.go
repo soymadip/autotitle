@@ -51,6 +51,8 @@ func init() {
 	// Default logger setup (before flags parse)
 	logger = log.New(os.Stdout)
 	configureStyles()
+
+	colorizeHelp(RootCmd)
 }
 
 func configureStyles() {
