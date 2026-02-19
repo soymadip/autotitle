@@ -160,6 +160,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Publish to Winget
+        id: winget-release
         uses: vedantmgoyal2009/winget-releaser@v2
         with:
           identifier: ${{ github.repository_owner }}.${{ needs.get-info.outputs.pkgname }}
@@ -168,3 +169,60 @@ jobs:
           installers-regex: '${{ needs.get-info.outputs.pkgname }}-windows-amd64\.exe$'
           max-versions-to-keep: 4
           token: ${{ secrets.WINGET_TOKEN }}
+
+      - name: Patch PackageDependencies into manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          PKG_ID: ${{ github.repository_owner }}.${{ needs.get-info.outputs.pkgname }}
+          VERSION: ${{ needs.get-info.outputs.version }}
+          FORK_OWNER: ${{ github.repository_owner }}
+        shell: pwsh
+        run: |
+          $PathSegment = $env:PKG_ID.Replace('.', '/')
+          $ManifestPath = "manifests/$($env:PKG_ID.ToLower()[0])/$PathSegment/$env:VERSION/$env:PKG_ID.installer.yaml"
+          $Headers = @{ Authorization = "token $env:GITHUB_TOKEN"; Accept = "application/vnd.github.v3+json" }
+
+          # Find the branch komac pushed — it's named <PkgId>-<Version>-<random hash>
+          $BranchPrefix = "$env:PKG_ID-$env:VERSION-"
+          $BranchesUrl = "https://api.github.com/repos/$env:FORK_OWNER/winget-pkgs/branches?per_page=100"
+          $Branches = Invoke-RestMethod -Uri $BranchesUrl -Headers $Headers
+          $Branch = ($Branches | Where-Object { $_.name -like "$BranchPrefix*" } | Select-Object -First 1).name
+
+          if (-not $Branch) {
+            Write-Output "No branch matching '$BranchPrefix*' found — skipping dependency patch."
+            exit 0
+          }
+          Write-Output "Found branch: $Branch"
+
+          # Fetch manifest file + SHA from fork branch
+          $ApiBase = "https://api.github.com/repos/$env:FORK_OWNER/winget-pkgs/contents/$ManifestPath"
+          try {
+            $File = Invoke-RestMethod -Uri "$ApiBase`?ref=$Branch" -Headers $Headers
+          } catch {
+            Write-Output "Manifest not found at $ManifestPath — skipping."
+            exit 0
+          }
+
+          $Content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($File.content))
+
+          # Idempotent — skip if already patched
+          if ($Content -match 'PackageDependencies') {
+            Write-Output "Dependencies already present — skipping."
+            exit 0
+          }
+
+          $DepsBlock = "Dependencies:`n  PackageDependencies:`n    - PackageIdentifier: MoritzBunkus.MKVToolNix`n    - PackageIdentifier: wez.AtomicParsley"
+
+          # Insert before ManifestType line
+          $Patched = $Content -replace '(ManifestType: installer)', "$DepsBlock`n`$1"
+
+          $Encoded = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Patched))
+          $Body = @{
+            message = "chore: add PackageDependencies for $env:PKG_ID $env:VERSION"
+            content = $Encoded
+            sha     = $File.sha
+            branch  = $Branch
+          } | ConvertTo-Json
+
+          Invoke-RestMethod -Method Put -Uri $ApiBase -Headers $Headers -Body $Body -ContentType "application/json"
+          Write-Output "✓ PackageDependencies patched into $ManifestPath on branch $Branch"
