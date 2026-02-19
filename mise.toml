@@ -20,7 +20,7 @@ DIST_DIR = "dist"
 # Tasks
 [tasks.setup]
 description = "Setup development environment"
-run = "mise install && go mod tidy"
+run = "mise install --yes && go mod download"
 
 [tasks.build]
 description = "Build development binary"
@@ -30,27 +30,24 @@ run = "go build -ldflags \"$LDFLAGS_BASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}
 
 [tasks.release]
 description = "Build release binary (stripped, optimized)"
-depends = ["test"]
-run = "go build -ldflags \"$LDFLAGS_RELEASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}} ./cmd/autotitle"
+run = "go build -trimpath -ldflags \"$LDFLAGS_RELEASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}} ./cmd/autotitle"
 
 [tasks.release-all]
 description = "Build optimized binaries for Linux, macOS (amd64/arm64) & Windows (amd64)"
-depends = ["test"]
 run = """
     mkdir -p {{env.BIN_DIR}}
     # Linux
-    GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-amd64 ./cmd/autotitle
-    GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-arm64 ./cmd/autotitle
+    GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-amd64 ./cmd/autotitle
+    GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-arm64 ./cmd/autotitle
     # macOS
-    GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-darwin-amd64 ./cmd/autotitle
-    GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-darwin-arm64 ./cmd/autotitle
+    GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-darwin-amd64 ./cmd/autotitle
+    GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-darwin-arm64 ./cmd/autotitle
     # Windows
-    GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-windows-amd64.exe ./cmd/autotitle
+    GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-windows-amd64.exe ./cmd/autotitle
 """
 
 [tasks.install]
 description = "Install optimized binary to GOPATH/bin"
-depends = ["test"]
 run = "go install -ldflags \"$LDFLAGS_RELEASE\" ./cmd/autotitle"
 
 [tasks.clean]
