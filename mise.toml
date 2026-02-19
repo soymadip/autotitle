@@ -30,11 +30,15 @@ run = "go build -ldflags \"$LDFLAGS_BASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}
 
 [tasks.release]
 description = "Build release binary (stripped, optimized)"
-run = "go build -trimpath -ldflags \"$LDFLAGS_RELEASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}} ./cmd/autotitle"
+run = """
+    mise install go
+    go build -trimpath -ldflags \"$LDFLAGS_RELEASE\" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}} ./cmd/autotitle
+"""
 
 [tasks.release-all]
 description = "Build optimized binaries for Linux, macOS (amd64/arm64) & Windows (amd64)"
 run = """
+    mise install go
     mkdir -p {{env.BIN_DIR}}
     # Linux
     GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS_RELEASE" -o {{env.BIN_DIR}}/{{env.BINARY_NAME}}-linux-amd64 ./cmd/autotitle
@@ -48,7 +52,10 @@ run = """
 
 [tasks.install]
 description = "Install optimized binary to GOPATH/bin"
-run = "go install -ldflags \"$LDFLAGS_RELEASE\" ./cmd/autotitle"
+run = """
+    mise install go
+    go install -ldflags \"$LDFLAGS_RELEASE\" ./cmd/autotitle
+"""
 
 [tasks.clean]
 description = "Clean build artifacts"
