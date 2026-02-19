@@ -2,6 +2,7 @@
 go = "1.26"
 golangci-lint = "latest"
 uv = "latest"
+"pipx:commitizen" = "latest"
 
 [shell_alias]
 cz = "cz --config {{env.CZ_CONFIG}}"

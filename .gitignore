@@ -4,6 +4,7 @@ GEMINI.md
 bin/
 dist/
 autotitle
+CHANGELOG.md
 
 # Testing
 test/
