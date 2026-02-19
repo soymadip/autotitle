@@ -40,7 +40,13 @@ const coloredUsageTmpl = `{{Header "Usage:"}}
 `
 
 func colorizeHelp(cmd *cobra.Command) {
-	cobra.AddTemplateFunc("Header", func(s string) string { return headerStyle.Render(s) })
+	cobra.AddTemplateFunc("Header", func(s string) string {
+		out := headerStyle.Render(s)
+		if s == "Usage:" {
+			return "\n" + out
+		}
+		return out
+	})
 	cobra.AddTemplateFunc("Command", func(s string) string { return commandStyle.Render(s) })
 
 	// Flags function colorizes individual flag names and dimmed separators

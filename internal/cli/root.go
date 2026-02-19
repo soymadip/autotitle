@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
@@ -35,6 +36,7 @@ var RootCmd = &cobra.Command{
 }
 
 func Execute() {
+	fmt.Println()
 	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
