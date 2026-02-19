@@ -15,7 +15,7 @@ var (
 )
 
 const coloredUsageTmpl = `{{Header "Usage:"}}
-  {{if .Runnable}}{{Command .UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{if .Runnable}}{{Usage .UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{Command .CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
 
 {{Header "Aliases:"}}
@@ -43,17 +43,39 @@ func colorizeHelp(cmd *cobra.Command) {
 	cobra.AddTemplateFunc("Header", func(s string) string { return headerStyle.Render(s) })
 	cobra.AddTemplateFunc("Command", func(s string) string { return commandStyle.Render(s) })
 
-	// Add Flags function to colorize flag names and separators
+	// Flags function colorizes individual flag names and dimmed separators
 	cobra.AddTemplateFunc("Flags", func(s string) string {
-		// Colorize flags
 		reFlags := regexp.MustCompile(`(-\w|--[\w-]+)`)
 		s = reFlags.ReplaceAllStringFunc(s, func(match string) string {
 			return flagStyle.Render(match)
 		})
 
-		// Colorize separator (comma between flags)
 		reSep := regexp.MustCompile(`, `)
 		s = reSep.ReplaceAllString(s, separatorStyle.Render(", "))
+
+		return s
+	})
+
+	// Usage function colorizes the top-level usage line including args
+	cobra.AddTemplateFunc("Usage", func(s string) string {
+		// Colorize <args> (required) - Yellow
+		reArgs := regexp.MustCompile(`<[a-zA-Z0-9_-]+>`)
+		s = reArgs.ReplaceAllStringFunc(s, func(match string) string {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Render(match)
+		})
+
+		// Colorize [args] (optional/flags) - Dimmed
+		// Use specific classes to avoid corrupting ANSI escape codes
+		reFlags := regexp.MustCompile(`\[[a-zA-Z0-9_-]+\]`)
+		s = reFlags.ReplaceAllStringFunc(s, func(match string) string {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(match)
+		})
+
+		// Colorize the command name (beginning of the line)
+		reCmd := regexp.MustCompile(`^\w+`)
+		s = reCmd.ReplaceAllStringFunc(s, func(match string) string {
+			return commandStyle.Render(match)
+		})
 
 		return s
 	})
