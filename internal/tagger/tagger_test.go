@@ -82,7 +82,31 @@ func TestIsMKV(t *testing.T) {
 	}
 }
 
-// Verify the template is valid XML (basic sanity — contains root Tags element)
+func TestIsTaggable(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/path/to/file.mkv", true},
+		{"/path/to/file.MKV", true},
+		{"/path/to/file.mp4", true},
+		{"/path/to/file.MP4", true},
+		{"/path/to/file.m4v", true},
+		{"/path/to/file.m4a", true},
+		{"/path/to/file.avi", false},
+		{"/path/to/file.webm", false},
+		{"/path/to/file.ts", false},
+		{"/path/to/file", false},
+	}
+	for _, c := range cases {
+		got := isTaggable(c.path)
+		if got != c.want {
+			t.Errorf("isTaggable(%q) = %v, want %v", c.path, got, c.want)
+		}
+	}
+}
+
+// Verify the template is valid XML (basic sanity)
 func TestWriteTagXML_ValidXML(t *testing.T) {
 	info := TagInfo{Title: "Test", Show: "Series"}
 	xml := renderTagXML(t, info)
@@ -93,32 +117,15 @@ func TestWriteTagXML_ValidXML(t *testing.T) {
 	assertContains(t, xml, "</Tags>")
 }
 
-func assertContains(t *testing.T, haystack, needle string) {
-	t.Helper()
-	if !strings.Contains(haystack, needle) {
-		t.Errorf("Expected XML to contain %q\nGot:\n%s", needle, haystack)
-	}
-}
-
-// min is available in Go 1.21+ but included here for older compat.
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// TestTagFile_Integration creates a real MKV with ffmpeg, tags it, and verifies with mkvinfo.
-// Skipped if ffmpeg or mkvpropedit are not available.
-func TestTagFile_Integration(t *testing.T) {
+// TestTagFile_MKV_Integration creates a real MKV with ffmpeg, tags it, and verifies with mkvinfo.
+func TestTagFile_MKV_Integration(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		t.Skip("ffmpeg not found; skipping integration test")
+		t.Skip("ffmpeg not found; skipping MKV integration test")
 	}
-	if !IsAvailable() {
-		t.Skip("mkvpropedit not found; skipping integration test")
+	if !IsMKVAvailable() {
+		t.Skip("mkvpropedit not found; skipping MKV integration test")
 	}
 
-	// Create a minimal valid MKV using ffmpeg
 	tmpDir := t.TempDir()
 	mkvPath := tmpDir + "/ep01.mkv"
 	ffmpegArgs := []string{
@@ -140,25 +147,83 @@ func TestTagFile_Integration(t *testing.T) {
 	}
 
 	if err := TagFile(context.Background(), mkvPath, info); err != nil {
-		t.Fatalf("TagFile failed: %v", err)
+		t.Fatalf("TagFile (MKV) failed: %v", err)
 	}
 
-	// Verify tags are embedded using mkvinfo --all (needed to show Tags section)
+	// mkvinfo --all is required to show the Tags section
 	out, err := exec.Command("mkvinfo", "--all", mkvPath).CombinedOutput()
 	if err != nil {
 		t.Fatalf("mkvinfo failed: %v\n%s", err, out)
 	}
 	outStr := string(out)
 
-	checks := []string{
-		"Attack on Titan",
-		"To You, in 2000 Years",
-		"2013-04-07",
-	}
-	for _, want := range checks {
+	for _, want := range []string{"Attack on Titan", "To You, in 2000 Years", "2013-04-07"} {
 		if !strings.Contains(outStr, want) {
 			t.Errorf("mkvinfo output missing %q\nFull output:\n%s", want, outStr)
 		}
 	}
-	t.Logf("✓ Tags verified in MKV:\n  title=%q show=%q date=%q", info.Title, info.Show, info.AirDate)
+	t.Logf("✓ MKV tags verified: title=%q show=%q date=%q", info.Title, info.Show, info.AirDate)
+}
+
+// TestTagFile_MP4_Integration creates a real MP4 with ffmpeg, tags it, and verifies with AtomicParsley.
+func TestTagFile_MP4_Integration(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not found; skipping MP4 integration test")
+	}
+	if !IsMP4Available() {
+		t.Skip("AtomicParsley not found; skipping MP4 integration test")
+	}
+
+	tmpDir := t.TempDir()
+	mp4Path := tmpDir + "/ep01.mp4"
+	ffmpegArgs := []string{
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+		"-f", "lavfi", "-i", "color=c=black:s=64x64:d=1",
+		"-map", "0:a", "-map", "1:v",
+		"-c:v", "libx264", "-c:a", "aac", "-shortest",
+		mp4Path, "-y", "-loglevel", "quiet",
+	}
+	if out, err := exec.Command("ffmpeg", ffmpegArgs...).CombinedOutput(); err != nil {
+		t.Fatalf("ffmpeg failed to create test MP4: %v\n%s", err, out)
+	}
+
+	info := TagInfo{
+		Title:       "To You, in 2000 Years",
+		Show:        "Attack on Titan",
+		EpisodeID:   "01",
+		EpisodeSort: 1,
+		AirDate:     "2013-04-07",
+	}
+
+	if err := TagFile(context.Background(), mp4Path, info); err != nil {
+		t.Fatalf("TagFile (MP4) failed: %v", err)
+	}
+
+	// Verify with atomicparsley -t (print all tags)
+	out, err := exec.Command(mp4Bin, mp4Path, "-t").CombinedOutput()
+	if err != nil {
+		t.Fatalf("AtomicParsley -t failed: %v\n%s", err, out)
+	}
+	outStr := string(out)
+
+	for _, want := range []string{"Attack on Titan", "To You, in 2000 Years"} {
+		if !strings.Contains(outStr, want) {
+			t.Errorf("AtomicParsley output missing %q\nFull output:\n%s", want, outStr)
+		}
+	}
+	t.Logf("✓ MP4 tags verified: title=%q show=%q", info.Title, info.Show)
+}
+
+func assertContains(t *testing.T, haystack, needle string) {
+	t.Helper()
+	if !strings.Contains(haystack, needle) {
+		t.Errorf("Expected output to contain %q\nGot:\n%s", needle, haystack)
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

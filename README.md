@@ -18,6 +18,7 @@ A CLI tool & Go library for automatically renaming media files (anime, TV shows)
 - 📚 **Episode Database** - Caches episode data from MyAnimeList and AnimeFillerList
 - 🧠 **Smart Updates** - Auto-updates database when new episodes air
 - 💾 **Smart Backups** - Automatic backup before renaming with restore capability
+- 🏷️ **Metadata Tagging** - Embeds episode/series info into `.mkv` (mkvpropedit) and `.mp4`/`.m4v` (atomicparsley) files
 - 📦 **Library & CLI** - Use as standalone tool or import as Go package
 
 ## Installation
@@ -61,6 +62,12 @@ autotitle init .
 
 # Perform rename
 autotitle .
+
+# Tag already-renamed files without re-renaming
+autotitle tag .
+
+# Rename without tagging
+autotitle --no-tag .
 
 # Restore if needed
 autotitle undo .
