@@ -157,7 +157,7 @@ jobs:
 
   update-winget:
     needs: get-info
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Publish to Winget
         id: winget-release
@@ -176,53 +176,46 @@ jobs:
           PKG_ID: ${{ github.repository_owner }}.${{ needs.get-info.outputs.pkgname }}
           VERSION: ${{ needs.get-info.outputs.version }}
           FORK_OWNER: ${{ github.repository_owner }}
-        shell: pwsh
         run: |
-          $PathSegment = $env:PKG_ID.Replace('.', '/')
-          $ManifestPath = "manifests/$($env:PKG_ID.ToLower()[0])/$PathSegment/$env:VERSION/$env:PKG_ID.installer.yaml"
-          $Headers = @{ Authorization = "token $env:GITHUB_TOKEN"; Accept = "application/vnd.github.v3+json" }
+          # Resolve manifest path
+          PATH_SEGMENT=$(echo "$PKG_ID" | tr '.' '/')
+          FIRST_CHAR=$(echo "${PKG_ID:0:1}" | tr '[:upper:]' '[:lower:]')
+          MANIFEST_PATH="manifests/$FIRST_CHAR/$PATH_SEGMENT/$VERSION/$PKG_ID.installer.yaml"
 
-          # Find the branch komac pushed — it's named <PkgId>-<Version>-<random hash>
-          $BranchPrefix = "$env:PKG_ID-$env:VERSION-"
-          $BranchesUrl = "https://api.github.com/repos/$env:FORK_OWNER/winget-pkgs/branches?per_page=100"
-          $Branches = Invoke-RestMethod -Uri $BranchesUrl -Headers $Headers
-          $Branch = ($Branches | Where-Object { $_.name -like "$BranchPrefix*" } | Select-Object -First 1).name
+          echo "Target Manifest: $MANIFEST_PATH"
 
-          if (-not $Branch) {
-            Write-Output "No branch matching '$BranchPrefix*' found — skipping dependency patch."
+          # Find branch
+          BRANCH=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$FORK_OWNER/winget-pkgs/branches?per_page=100" | jq -r ".[] | select(.name | startswith(\"$PKG_ID-$VERSION-\")) | .name" | head -n 1)
+
+          if [ -z "$BRANCH" ] || [ "$BRANCH" == "null" ]; then
+            echo "No branch matching '$PKG_ID-$VERSION-*' found — skipping patch."
             exit 0
-          }
-          Write-Output "Found branch: $Branch"
+          fi
 
-          # Fetch manifest file + SHA from fork branch
-          $ApiBase = "https://api.github.com/repos/$env:FORK_OWNER/winget-pkgs/contents/$ManifestPath"
-          try {
-            $File = Invoke-RestMethod -Uri "$ApiBase`?ref=$Branch" -Headers $Headers
-          } catch {
-            Write-Output "Manifest not found at $ManifestPath — skipping."
+          # Fetch manifest
+          API_URL="https://api.github.com/repos/$FORK_OWNER/winget-pkgs/contents/$MANIFEST_PATH?ref=$BRANCH"
+          FILE_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$API_URL")
+          if ! echo "$FILE_DATA" | jq -e '.content' > /dev/null; then
+            echo "Manifest not found — skipping."
             exit 0
-          }
+          fi
 
-          $Content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($File.content))
+          CONTENT=$(echo "$FILE_DATA" | jq -r '.content' | tr -d '\n\r' | base64 -d)
+          SHA=$(echo "$FILE_DATA" | jq -r '.sha')
 
-          # Idempotent — skip if already patched
-          if ($Content -match 'PackageDependencies') {
-            Write-Output "Dependencies already present — skipping."
+          if [[ "$CONTENT" == *"PackageDependencies"* ]]; then
+            echo "Already patched — skipping."
             exit 0
-          }
+          fi
 
-          $DepsBlock = "Dependencies:`n  PackageDependencies:`n    - PackageIdentifier: MoritzBunkus.MKVToolNix`n    - PackageIdentifier: wez.AtomicParsley"
+          # Patch with yq (structural YAML update)
+          PATCHED=$(echo "$CONTENT" | yq '.Dependencies.PackageDependencies = [
+            {"PackageIdentifier": "MoritzBunkus.MKVToolNix"},
+            {"PackageIdentifier": "wez.AtomicParsley"}
+          ]' -)
 
-          # Insert before ManifestType line
-          $Patched = $Content -replace '(ManifestType: installer)', "$DepsBlock`n`$1"
+          ENCODED=$(echo "$PATCHED" | base64 -w 0)
+          BODY=$(jq -n --arg msg "chore: add PackageDependencies for $PKG_ID $VERSION" --arg content "$ENCODED" --arg sha "$SHA" --arg branch "$BRANCH" '{message: $msg, content: $content, sha: $sha, branch: $branch}')
 
-          $Encoded = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Patched))
-          $Body = @{
-            message = "chore: add PackageDependencies for $env:PKG_ID $env:VERSION"
-            content = $Encoded
-            sha     = $File.sha
-            branch  = $Branch
-          } | ConvertTo-Json
-
-          Invoke-RestMethod -Method Put -Uri $ApiBase -Headers $Headers -Body $Body -ContentType "application/json"
-          Write-Output "✓ PackageDependencies patched into $ManifestPath on branch $Branch"
+          curl -X PUT -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$BODY" "$API_URL"
+          echo "✓ Manifest patched on branch $BRANCH"
