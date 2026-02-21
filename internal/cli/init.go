@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -49,12 +48,13 @@ func runInit(cmd *cobra.Command, path string) {
 		autotitle.WithOffset(flagInitOffset),
 		autotitle.WithPadding(flagInitPadding),
 	}
+
 	if flagInitForce {
 		opts = append(opts, autotitle.WithForce())
 	}
 
 	if err := autotitle.Init(cmd.Context(), path, opts...); err != nil {
-		logger.Error(fmt.Sprintf("Failed to init config: %v", err))
+		logger.Error("Failed to init config", "error", err)
 		os.Exit(1)
 	}
 

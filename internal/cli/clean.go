@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/mydehq/autotitle"
@@ -28,7 +27,7 @@ func runClean(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	if flagCleanGlobal {
 		if err := autotitle.CleanAll(ctx); err != nil {
-			logger.Error(fmt.Sprintf("Failed to clean global backups: %v", err))
+			logger.Error("Failed to clean global backups", "error", err)
 			os.Exit(1)
 		}
 		logger.Info(StyleHeader.Render("Removed all backups globally"))
@@ -36,12 +35,12 @@ func runClean(cmd *cobra.Command, args []string) {
 	}
 
 	if len(args) == 0 {
-		logger.Error("Please specify a path or use -g for global cleanup")
+		logger.Error("Please specify a path or use -a for global cleanup")
 		os.Exit(1)
 	}
 
 	if err := autotitle.Clean(ctx, args[0]); err != nil {
-		logger.Error(fmt.Sprintf("Failed to remove backup for %s: %v", args[0], err))
+		logger.Error("Failed to remove backup", "path", args[0], "error", err)
 		os.Exit(1)
 	}
 	logger.Info(StyleHeader.Render("Removed backup"), "path", StylePath.Render(args[0]))

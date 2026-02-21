@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -25,7 +24,7 @@ Useful for files that are already correctly named.`,
 		}
 		absPath, err := filepath.Abs(path)
 		if err != nil {
-			logger.Error(fmt.Sprintf("Invalid path: %v", err))
+			logger.Error("Invalid path", "error", err)
 			os.Exit(1)
 		}
 		runTag(cmd, absPath)
@@ -58,7 +57,7 @@ func runTag(cmd *cobra.Command, path string) {
 	}
 
 	if err := autotitle.Tag(cmd.Context(), path, opts...); err != nil {
-		logger.Error(fmt.Sprintf("Tagging failed: %v", err))
+		logger.Error("Tagging failed", "error", err)
 		os.Exit(1)
 	}
 }

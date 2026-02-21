@@ -17,7 +17,7 @@ const coloredUsageTmpl = `{{Header "Usage:"}}
 {{.Example}}{{end}}{{if .HasAvailableSubCommands}}
 
 {{Header "Available Commands:"}}{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
-  {{Command (printf "%-11s" .Name)}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+  {{Command (printf "%-15s" .Name)}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
 {{Header "Flags:"}}
 {{.LocalFlags.FlagUsages | trimTrailingWhitespaces | Flags}}{{end}}{{if .HasAvailableInheritedFlags}}
@@ -26,7 +26,7 @@ const coloredUsageTmpl = `{{Header "Usage:"}}
 {{.InheritedFlags.FlagUsages | trimTrailingWhitespaces | Flags}}{{end}}{{if .HasHelpSubCommands}}
 
 {{Header "Additional help topics:"}}{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
-  {{Command (printf "%-11s" .Name)}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+  {{Command (printf "%-15s" .Name)}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
 
 {{Header "Use"}} {{Command (printf "%s [command] --help" .CommandPath)}} {{Header "for more information about a command."}}{{end}}
 `

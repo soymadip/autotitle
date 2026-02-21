@@ -29,13 +29,15 @@ var (
 	StylePath    = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	StylePattern = lipgloss.NewStyle().Foreground(lipgloss.Color("192"))
 	StyleDim     = lipgloss.NewStyle().Foreground(lipgloss.Color("247"))
-	styleFlag = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("204")) // Pink
+	styleFlag    = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("204")) // Pink
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "autotitle <path>",
-	Short: "Rename media files with proper titles",
-	Args:  cobra.ExactArgs(1),
+	Use:           "autotitle <path>",
+	Short:         "Rename media files with proper titles",
+	SilenceErrors: true,
+	SilenceUsage:  true,
+	Args:          cobra.ExactArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		setupLogger()
 	},
@@ -47,6 +49,12 @@ var RootCmd = &cobra.Command{
 func Execute() {
 	fmt.Println()
 	if err := RootCmd.Execute(); err != nil {
+		if logger != nil {
+			logger.Error(err)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		}
+		RootCmd.Usage()
 		os.Exit(1)
 	}
 }

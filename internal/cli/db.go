@@ -88,7 +88,7 @@ func runDBGen(ctx context.Context, url string) {
 
 	generated, err := autotitle.DBGen(ctx, url, opts...)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to generate database: %v", err))
+		logger.Error("Failed to generate database", "error", err)
 		os.Exit(1)
 	}
 
@@ -102,7 +102,7 @@ func runDBGen(ctx context.Context, url string) {
 func runDBList(ctx context.Context) {
 	items, err := autotitle.DBList(ctx, flagDBProvider)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to list databases: %v", err))
+		logger.Error("Failed to list databases", "error", err)
 		os.Exit(1)
 	}
 
@@ -111,15 +111,15 @@ func runDBList(ctx context.Context) {
 		return
 	}
 
-	fmt.Printf("%s: %s\n", StyleHeader.Render("Cached databases"), StylePattern.Render(fmt.Sprint(len(items))))
+	logger.Print(StyleHeader.Render("Cached databases"), "count", StylePattern.Render(fmt.Sprint(len(items))))
 	for _, item := range items {
-		fmt.Printf("  %s %s/%s: %s %s\n",
+		logger.Print(fmt.Sprintf("  %s %s/%s: %s %s",
 			StyleDim.Render("-"),
 			StyleHeader.Render(item.Provider),
 			StylePath.Render(item.ID),
 			item.Title,
 			StyleDim.Render(fmt.Sprintf("(%d episodes)", item.EpisodeCount)),
-		)
+		))
 	}
 }
 
@@ -133,7 +133,7 @@ func runDBInfo(ctx context.Context, target string) {
 
 	media, err := autotitle.DBInfo(ctx, prov, id)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to get database info: %v", err))
+		logger.Error("Failed to get database info", "error", err)
 		os.Exit(1)
 	}
 	if media == nil {
@@ -143,19 +143,19 @@ func runDBInfo(ctx context.Context, target string) {
 
 	keyStyle := StyleHeader.Width(15)
 
-	fmt.Printf("%s %s\n", keyStyle.Render("Title:"), media.Title)
-	fmt.Printf("%s %d\n", keyStyle.Render("Episodes:"), len(media.Episodes))
-	fmt.Printf("%s %s\n", keyStyle.Render("ID:"), StylePath.Render(media.ID))
-	fmt.Printf("%s %s\n", keyStyle.Render("Provider:"), StylePattern.Render(media.Provider))
+	logger.Print(fmt.Sprintf("%s %s", keyStyle.Render("Title:"), media.Title))
+	logger.Print(fmt.Printf("%s %d", keyStyle.Render("Episodes:"), len(media.Episodes)))
+	logger.Print(fmt.Printf("%s %s", keyStyle.Render("ID:"), StylePath.Render(media.ID)))
+	logger.Print(fmt.Printf("%s %s", keyStyle.Render("Provider:"), StylePattern.Render(media.Provider)))
 	if media.FillerSource != "" {
-		fmt.Printf("%s %s\n", keyStyle.Render("Filler Source:"), media.FillerSource)
+		logger.Print(fmt.Printf("%s %s", keyStyle.Render("Filler Source:"), media.FillerSource))
 	}
 }
 
 func runDBRm(ctx context.Context, args []string) {
 	if flagDBAll {
 		if err := autotitle.DBDeleteAll(ctx); err != nil {
-			logger.Error(fmt.Sprintf("Failed to delete all databases: %v", err))
+			logger.Error("Failed to delete all databases", "error", err)
 			os.Exit(1)
 		}
 		logger.Info(StyleHeader.Render("Deleted all databases"))
@@ -175,7 +175,7 @@ func runDBRm(ctx context.Context, args []string) {
 	prov, id := parts[0], parts[1]
 
 	if err := autotitle.DBDelete(ctx, prov, id); err != nil {
-		logger.Error(fmt.Sprintf("Failed to delete database: %v", err))
+		logger.Error("Failed to delete database", "error", err)
 		os.Exit(1)
 	}
 	logger.Info(StyleHeader.Render("Deleted database"), "provider", prov, "id", StylePath.Render(id))
@@ -184,8 +184,8 @@ func runDBRm(ctx context.Context, args []string) {
 func runDBPath() {
 	path, err := autotitle.DBPath()
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to get DB path: %v", err))
+		logger.Error("Failed to get DB path", "error", err)
 		os.Exit(1)
 	}
-	fmt.Println(path)
+	logger.Print(path)
 }
