@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mydehq/autotitle"
@@ -43,5 +44,5 @@ func runClean(cmd *cobra.Command, args []string) {
 		logger.Error("Failed to remove backup", "path", args[0], "error", err)
 		os.Exit(1)
 	}
-	logger.Info(StyleHeader.Render("Removed backup"), "path", StylePath.Render(args[0]))
+	logger.Info(fmt.Sprintf("%s: %s", StyleHeader.Render("Removed backup"), StylePath.Render(args[0])))
 }

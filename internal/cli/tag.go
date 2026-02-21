@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -45,13 +46,13 @@ func runTag(cmd *cobra.Command, path string) {
 		autotitle.WithEvents(func(e autotitle.Event) {
 			switch e.Type {
 			case autotitle.EventInfo:
-				logger.Info(StyleHeader.Render("Tag"), "msg", e.Message)
+				logger.Info(fmt.Sprintf("%s: %s", StyleHeader.Render("Tag"), e.Message))
 			case autotitle.EventSuccess:
-				logger.Info(StyleHeader.Render("Tagged"), "msg", e.Message)
+				logger.Info(fmt.Sprintf("%s: %s", StyleHeader.Render("Tagged"), e.Message))
 			case autotitle.EventWarning:
-				logger.Warn(StyleHeader.Render("Tag Warning"), "msg", e.Message)
+				logger.Warn(fmt.Sprintf("%s: %s", StyleHeader.Render("Tag Warning"), e.Message))
 			case autotitle.EventError:
-				logger.Error(StyleHeader.Render("Tag Error"), "msg", e.Message)
+				logger.Error(fmt.Sprintf("%s: %s", StyleHeader.Render("Tag Error"), e.Message))
 			}
 		}),
 	}

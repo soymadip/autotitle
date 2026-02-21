@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -59,5 +60,5 @@ func runInit(cmd *cobra.Command, path string) {
 	}
 
 	mapFile := "_autotitle.yml"
-	logger.Info(StyleHeader.Render("Created config"), "path", StylePath.Render(filepath.Join(path, mapFile)))
+	logger.Info(fmt.Sprintf("%s: %s", StyleHeader.Render("Created config"), StylePath.Render(filepath.Join(path, mapFile))))
 }
