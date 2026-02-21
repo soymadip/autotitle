@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/mydehq/autotitle"
+	"github.com/mydehq/autotitle/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,7 @@ var (
 var RootCmd = &cobra.Command{
 	Use:           "autotitle <path>",
 	Short:         "Rename media files with proper titles",
+	Version:       version.String(),
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	Args:          cobra.ExactArgs(1),
@@ -54,7 +56,7 @@ func Execute() {
 func init() {
 	RootCmd.Flags().BoolVarP(&flagDryRun, "dry-run", "d", false, "Preview changes without applying")
 	RootCmd.Flags().BoolVarP(&flagNoBackup, "no-backup", "n", false, "Skip backup creation")
-	RootCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Verbose output")
+	RootCmd.Flags().BoolVarP(&flagVerbose, "verbose", "V", false, "Verbose output")
 	RootCmd.Flags().IntVarP(&flagOffset, "offset", "o", 0, "Episode number offset (db_num = local_num + offset)")
 	RootCmd.Flags().StringVarP(&flagFillerURL, "filler", "F", "", "Override filler source URL")
 	RootCmd.Flags().BoolVarP(&flagForce, "force", "f", false, "Force database refresh")
@@ -79,6 +81,9 @@ func init() {
 	})
 
 	colorizeHelp(RootCmd)
+
+	// Pre-register version flag with -v shorthand.
+	RootCmd.Flags().BoolP("version", "v", false, "Print version information")
 }
 
 func configureStyles() {
