@@ -165,9 +165,9 @@ func runRename(ctx context.Context, cmd *cobra.Command, path string) {
 
 	if !flagQuiet {
 		logger.Info("Summary",
-			"renamed", lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Render(fmt.Sprint(success)),
-			"skipped", lipgloss.NewStyle().Foreground(lipgloss.Color("192")).Render(fmt.Sprint(skipped)),
-			"failed", lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Render(fmt.Sprint(failed)),
+			"renamed", StyleCommand.Render(fmt.Sprint(success)),
+			"skipped", StylePattern.Render(fmt.Sprint(skipped)),
+			"failed", styleFlag.Render(fmt.Sprint(failed)),
 		)
 	}
 }
