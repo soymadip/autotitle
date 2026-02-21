@@ -144,11 +144,11 @@ func runDBInfo(ctx context.Context, target string) {
 	keyStyle := StyleHeader.Width(15)
 
 	logger.Print(fmt.Sprintf("%s %s", keyStyle.Render("Title:"), media.Title))
-	logger.Print(fmt.Printf("%s %d", keyStyle.Render("Episodes:"), len(media.Episodes)))
-	logger.Print(fmt.Printf("%s %s", keyStyle.Render("ID:"), StylePath.Render(media.ID)))
-	logger.Print(fmt.Printf("%s %s", keyStyle.Render("Provider:"), StylePattern.Render(media.Provider)))
+	logger.Print(fmt.Sprintf("%s %d", keyStyle.Render("Episodes:"), len(media.Episodes)))
+	logger.Print(fmt.Sprintf("%s %s", keyStyle.Render("ID:"), StylePath.Render(media.ID)))
+	logger.Print(fmt.Sprintf("%s %s", keyStyle.Render("Provider:"), StylePattern.Render(media.Provider)))
 	if media.FillerSource != "" {
-		logger.Print(fmt.Printf("%s %s", keyStyle.Render("Filler Source:"), media.FillerSource))
+		logger.Print(fmt.Sprintf("%s %s", keyStyle.Render("Filler Source:"), media.FillerSource))
 	}
 }
 
