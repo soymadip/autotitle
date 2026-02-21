@@ -219,3 +219,11 @@ jobs:
 
           curl -X PUT -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$BODY" "$API_URL"
           echo "✓ Manifest structurally patched & CRLF forced"
+
+          # Find and print Winget PR URL to GitHub Summary
+          UPSTREAM_PR=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/microsoft/winget-pkgs/pulls?head=$FORK_OWNER:$BRANCH&state=open" | jq -r ".[0].html_url")
+          if [ "$UPSTREAM_PR" != "null" ] && [ -n "$UPSTREAM_PR" ]; then
+            echo "### 📦 Winget Submission" >> $GITHUB_STEP_SUMMARY
+            echo "Successfully patched and submitted version **$VERSION** to Winget." >> $GITHUB_STEP_SUMMARY
+            echo "- **Pull Request**: $UPSTREAM_PR" >> $GITHUB_STEP_SUMMARY
+          fi
