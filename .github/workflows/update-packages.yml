@@ -208,14 +208,14 @@ jobs:
             exit 0
           fi
 
-          # Patch with yq (structural YAML update)
+          # Patch with yq and force CRLF line endings
           PATCHED=$(echo "$CONTENT" | yq '.Dependencies.PackageDependencies = [
             {"PackageIdentifier": "MoritzBunkus.MKVToolNix"},
             {"PackageIdentifier": "wez.AtomicParsley"}
-          ]' -)
+          ]' - | sed 's/$/\r/')
 
           ENCODED=$(echo "$PATCHED" | base64 -w 0)
           BODY=$(jq -n --arg msg "chore: add PackageDependencies for $PKG_ID $VERSION" --arg content "$ENCODED" --arg sha "$SHA" --arg branch "$BRANCH" '{message: $msg, content: $content, sha: $sha, branch: $branch}')
 
           curl -X PUT -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$BODY" "$API_URL"
-          echo "✓ Manifest patched on branch $BRANCH"
+          echo "✓ Manifest structurally patched & CRLF forced"
