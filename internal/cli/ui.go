@@ -57,7 +57,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				huh.NewGroup(
 					huh.NewInput().
 						Title("Search query").
-						Description("\nEdit the query to search for your series").
+						Description("\nEdit the query to search for your series\n").
 						Value(&searchQuery),
 				),
 			).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
@@ -125,26 +125,6 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 			step++
 
 		case 4:
-			// Live filename preview
-			preview := buildFilenamePreview(outputFields, " ")
-			err := RunForm(huh.NewForm(
-				huh.NewGroup(
-					huh.NewNote().
-						Title("Example output").
-						Description(fmt.Sprintf("\nWith current settings, a file might be renamed to:\n\n  %s", preview)),
-				),
-			).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
-
-			if err != nil {
-				if errors.Is(handleAbort(err), ErrUserBack) {
-					step--
-					continue
-				}
-				return err
-			}
-			step++
-
-		case 5:
 			// Optional refinement fields
 			paddingStr := "0"
 			offsetStr := "0"
@@ -194,7 +174,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				refinementFields = append(refinementFields,
 					huh.NewInput().
 						Title("Episode padding").
-						Description("\nOptional. Force digit width (e.g. 2 → 01)").
+						Description("\nOptional. Force digit width (e.g. 2 → E01)").
 						Value(&paddingStr).
 						Validate(validateInt),
 				)
@@ -443,53 +423,86 @@ func selectOutputFields(theme *huh.Theme) ([]string, error) {
 		opts[i] = huh.NewOption(label, val)
 	}
 
-	choice := ""
-	err := RunForm(huh.NewForm(
-		huh.NewGroup(
-			huh.NewNote().
-				Title("Output Format Legend").
-				Description("\n• SERIES — Series name (English)\n• EP\\_NUM — Episode number (e.g. 01)\n• EP\\_NAME — Episode title\n• FILLER — Filler tag (if detected)\n• RES    — Resolution (e.g. 1080p)\n• +      — Dynamic spacing/glue"),
-
-			huh.NewSelect[string]().
-				Title("Output format\n").
-				Options(opts...).
-				Value(&choice),
-		),
-	).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
-	if err != nil {
-		return nil, err
-	}
-
-	if choice == "__custom__" {
-		input := ""
+	for {
+		ClearAndPrintBanner()
+		choice := ""
 		err := RunForm(huh.NewForm(
 			huh.NewGroup(
-				huh.NewInput().
-					Title("Custom output fields").
-					Description("\nEnter fields (comma-separated). e.g: SERIES, -, EP_NUM, -, EP_NAME").
-					Value(&input).
-					Validate(func(s string) error {
-						// we allow empty for going back!
-						if strings.TrimSpace(s) == "" {
-							return nil
-						}
-						// Let's assume valid
-						return nil
-					}),
+				huh.NewSelect[string]().
+					Title("Output format\n").
+					Options(opts...).
+					Value(&choice),
 			),
 		).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
 		if err != nil {
 			return nil, err
 		}
 
-		if strings.TrimSpace(input) == "" {
-			return nil, ErrUserBack
+		if choice == "__custom__" {
+			input := ""
+			for {
+				ClearAndPrintBanner()
+				err := RunForm(huh.NewForm(
+					huh.NewGroup(
+						huh.NewNote().
+							Title("Output Format Legend").
+							Description("\n• SERIES  — Series name (English)\n• EP\\_NUM  — Episode number (e.g. 01)\n• EP\\_NAME — Episode title\n• FILLER  — Filler tag (if detected)\n• RES     — Resolution (e.g. 1080p)\n• +       — Dynamic spacing/glue"),
+						huh.NewInput().
+							Title("Custom output fields").
+							Description("\nEnter fields (comma-separated). e.g: SERIES, -, EP_NUM, -, EP_NAME").
+							Value(&input).
+							Validate(func(s string) error {
+								// we allow empty for going back!
+								if strings.TrimSpace(s) == "" {
+									return nil
+								}
+								// Let's assume valid
+								return nil
+							}),
+					),
+				).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
+				if err != nil {
+					if errors.Is(handleAbort(err), ErrUserBack) {
+						break
+					}
+					return nil, err
+				}
+
+				if strings.TrimSpace(input) == "" {
+					break // break inner loop, go back to preset menu
+				}
+
+				parsed := parseCommaSeparated(input)
+
+				preview := buildFilenamePreview(parsed, " ")
+				confirm := true
+				err = RunForm(huh.NewForm(
+					huh.NewGroup(
+						huh.NewNote().
+							Title("Example output").
+							Description(fmt.Sprintf("\nWith current settings, a file might be renamed to:\n\n  %s", preview)),
+						huh.NewConfirm().
+							Title("Use this format?").
+							Value(&confirm),
+					),
+				).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
+				if err != nil {
+					if errors.Is(handleAbort(err), ErrUserBack) {
+						continue // back to custom input
+					}
+					return nil, err
+				}
+
+				if confirm {
+					return parsed, nil
+				}
+				// if !confirm, loop back, keep input string
+			}
+			continue
 		}
 
-		return parseCommaSeparated(input), nil
+		return strings.Split(choice, ","), nil
 	}
-
-	return strings.Split(choice, ","), nil
 }
 
 // buildFilenamePreview creates an example filename using mock episode data.
@@ -564,44 +577,74 @@ func promptManualURL(theme *huh.Theme) (string, error) {
 	return strings.TrimSpace(url), nil
 }
 
-// promptCustomPatterns asks for comma-separated patterns, allowing empty submission to 'go back'.
 func promptCustomPatterns(theme *huh.Theme) ([]string, error) {
 	input := ""
-	err := RunForm(huh.NewForm(
-		huh.NewGroup(
-			huh.NewNote().
-				Title("Input Placeholder Legend").
-				Description("\n• {{SERIES}} — Matches series name\n• {{EP\\_NUM}} — Matches episode number\n• {{RES}}    — Matches resolution (e.g. 1080p)\n• {{ANY}}    — Matches any character(s)\n• {{EXT}}    — Matches file extension"),
-			huh.NewInput().
-				Title("Custom input patterns").
-				Description("\nLeave empty to go back").
-				Value(&input).
-				Validate(func(s string) error {
-					// empty is ok, we handle it as 'back'
-					if strings.TrimSpace(s) == "" {
+	for {
+		ClearAndPrintBanner()
+		err := RunForm(huh.NewForm(
+			huh.NewGroup(
+				huh.NewNote().
+					Title("Input Placeholder Legend").
+					Description("\n• {{SERIES}} — Matches series name\n• {{EP\\_NUM}} — Matches episode number\n• {{RES}}    — Matches resolution (e.g. 1080p)\n• {{ANY}}    — Matches any character(s)\n• {{EXT}}    — Matches file extension"),
+				huh.NewInput().
+					Title("Custom input patterns").
+					Description("\nLeave empty to go back").
+					Value(&input).
+					Validate(func(s string) error {
+						// empty is ok, we handle it as 'back'
+						if strings.TrimSpace(s) == "" {
+							return nil
+						}
+						for _, p := range strings.Split(s, ",") {
+							p = strings.TrimSpace(p)
+							if p == "" {
+								continue
+							}
+							if _, err := matcher.Compile(p); err != nil {
+								return fmt.Errorf("invalid pattern %q: %w", p, err)
+							}
+						}
 						return nil
-					}
-					for _, p := range strings.Split(s, ",") {
-						p = strings.TrimSpace(p)
-						if p == "" {
-							continue
-						}
-						if _, err := matcher.Compile(p); err != nil {
-							return fmt.Errorf("invalid pattern %q: %w", p, err)
-						}
-					}
-					return nil
-				}),
-		),
-	).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
-	if err != nil {
-		return nil, err
-	}
+					}),
+			),
+		).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
+		if err != nil {
+			return nil, err
+		}
 
-	if strings.TrimSpace(input) == "" {
-		return nil, ErrUserBack // explicitly use the sentinel for Back
+		if strings.TrimSpace(input) == "" {
+			return nil, ErrUserBack // explicitly use the sentinel for Back
+		}
+
+		parsed := parseCommaSeparated(input)
+
+		var bulleted []string
+		for _, p := range parsed {
+			bulleted = append(bulleted, "  • "+p)
+		}
+
+		confirm := true
+		err = RunForm(huh.NewForm(
+			huh.NewGroup(
+				huh.NewNote().
+					Title("Parsed patterns").
+					Description(fmt.Sprintf("\n%s", strings.Join(bulleted, "\n"))),
+				huh.NewConfirm().
+					Title("Use these patterns?").
+					Value(&confirm),
+			),
+		).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
+		if err != nil {
+			if errors.Is(handleAbort(err), ErrUserBack) {
+				continue
+			}
+			return nil, err
+		}
+
+		if confirm {
+			return parsed, nil
+		}
 	}
-	return parseCommaSeparated(input), nil
 }
 
 // parseCommaSeparated splits a comma-separated string into trimmed, non-empty parts.
