@@ -91,7 +91,7 @@ func runInit(cmd *cobra.Command, path string) {
 			os.Exit(1)
 		}
 		if !overwrite {
-			logger.Info(ui.StyleDim.Render("Init cancelled"))
+			logger.Warn(ui.StyleDim.Render("Init cancelled"))
 			return
 		}
 	}

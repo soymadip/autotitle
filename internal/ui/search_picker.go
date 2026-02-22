@@ -250,7 +250,7 @@ func runStreamingSearch(ctx context.Context, query string) (string, error) {
 	if m.aborted {
 		if interceptedKey == "ctrl+c" {
 			fmt.Println()
-			logger.Info(StyleDim.Render("Init cancelled"))
+			logger.Warn(StyleDim.Render("Init cancelled"))
 			return "", huh.ErrUserAborted
 		}
 		return "", huh.ErrUserAborted

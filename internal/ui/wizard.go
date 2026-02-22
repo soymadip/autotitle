@@ -80,7 +80,7 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 					// We are at the first step, so "back" means abort.
 					fmt.Println()
 					if logger != nil {
-						logger.Info(StyleDim.Render("Init cancelled"))
+						logger.Warn(StyleDim.Render("Init cancelled"))
 					}
 					os.Exit(0)
 				}
@@ -271,7 +271,7 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 			if !confirmed {
 				fmt.Println()
 				if logger != nil {
-					logger.Info(StyleDim.Render("Init cancelled"))
+					logger.Warn(StyleDim.Render("Init cancelled"))
 				}
 				os.Exit(0)
 				return nil
@@ -314,7 +314,7 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 			// Perform DB Generation
 			if flags.DryRun {
 				if logger != nil {
-					logger.Info(StyleDim.Render("[DRY RUN] Skipping DB generation"))
+					logger.Warn(StyleDim.Render("[DRY RUN] Skipping DB generation"))
 				}
 				return nil // done!
 			}
@@ -342,7 +342,7 @@ func HandleAbort(err error) error {
 		if interceptedKey == "ctrl+c" {
 			fmt.Println()
 			if logger != nil {
-				logger.Info(StyleDim.Render("Init cancelled"))
+				logger.Warn(StyleDim.Render("Init cancelled"))
 			}
 			os.Exit(0)
 		}

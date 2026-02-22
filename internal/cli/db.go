@@ -108,7 +108,7 @@ func runDBList(ctx context.Context) {
 	}
 
 	if len(items) == 0 {
-		logger.Info("No databases found")
+		logger.Warn("No databases found")
 		return
 	}
 
