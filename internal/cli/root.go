@@ -31,11 +31,19 @@ var RootCmd = &cobra.Command{
 	Version:       version.String(),
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	Args:          cobra.ExactArgs(1),
+	Args:          cobra.MaximumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		setupLogger()
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 0 {
+			logger.Error("No path provided.\n")
+			fmt.Println(ui.StyleHeader.Render("Try running:"))
+			fmt.Printf("    %s %s\n", ui.StyleCommand.Render("autotitle ."), ui.StyleDim.Render("  Process current directory"))
+			fmt.Printf("    %s %s\n", ui.StyleCommand.Render("autotitle -h"), ui.StyleDim.Render(" Show all commands and flags"))
+			fmt.Println()
+			os.Exit(1)
+		}
 		runRename(cmd.Context(), cmd, args[0])
 	},
 }
