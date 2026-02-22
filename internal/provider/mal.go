@@ -280,7 +280,7 @@ func (p *MALProvider) fetchEpisodes(ctx context.Context, malID int) ([]types.Epi
 func (p *MALProvider) Search(ctx context.Context, query string) ([]types.SearchResult, error) {
 	p.sleep()
 
-	urlStr := fmt.Sprintf("%s/anime?q=%s&limit=5", jikanAPIURL, url.QueryEscape(query))
+	urlStr := fmt.Sprintf("%s/anime?q=%s&limit=20", jikanAPIURL, url.QueryEscape(query))
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, err

@@ -155,9 +155,9 @@ func (m searchPicker) View() string {
 
 	if len(filtered) == 0 {
 		if m.done {
-			b.WriteString(StyleDim.Render("  No results found.\n"))
+			b.WriteString(StyleDim.Render("  No results found.") + "\n")
 		} else {
-			b.WriteString(StyleDim.Render("  Waiting for results…\n"))
+			b.WriteString(StyleDim.Render("  Waiting for results…") + "\n")
 		}
 	} else {
 		// Calculate visible window
@@ -177,7 +177,7 @@ func (m searchPicker) View() string {
 		}
 
 		if start > 0 {
-			b.WriteString(StyleDim.Render(fmt.Sprintf("  ↑ %d more\n", start)))
+			b.WriteString(StyleDim.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
 		}
 
 		selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(colorCommand)
@@ -200,7 +200,7 @@ func (m searchPicker) View() string {
 		}
 
 		if end < len(filtered) {
-			b.WriteString(StyleDim.Render(fmt.Sprintf("  ↓ %d more\n", len(filtered)-end)))
+			b.WriteString(StyleDim.Render(fmt.Sprintf("  ↓ %d more", len(filtered)-end)) + "\n")
 		}
 	}
 
