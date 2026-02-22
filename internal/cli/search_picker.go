@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -34,12 +35,19 @@ type searchPicker struct {
 
 	// Visible window for scrolling
 	windowSize int
+
+	spinner spinner.Model
 }
 
 func newSearchPicker(ch <-chan types.SearchResult) searchPicker {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = StyleCommand
+
 	return searchPicker{
 		ch:         ch,
 		windowSize: 12,
+		spinner:    s,
 	}
 }
 
@@ -55,7 +63,10 @@ func waitForResult(ch <-chan types.SearchResult) tea.Cmd {
 }
 
 func (m searchPicker) Init() tea.Cmd {
-	return waitForResult(m.ch)
+	return tea.Batch(
+		waitForResult(m.ch),
+		m.spinner.Tick,
+	)
 }
 
 func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -68,6 +79,11 @@ func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamDoneMsg:
 		m.done = true
 		return m, nil
+
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 
 	case tea.KeyMsg:
 		filtered := m.filteredResults()
@@ -127,7 +143,7 @@ func (m searchPicker) View() string {
 	if m.done {
 		status = StyleDim.Render(fmt.Sprintf("  %d results", len(m.results)))
 	} else {
-		status = StyleCommand.Render(fmt.Sprintf("  ⟳ searching… %d so far", len(m.results)))
+		status = StyleCommand.Render(fmt.Sprintf("  %s searching… %d so far", m.spinner.View(), len(m.results)))
 	}
 	b.WriteString(title + status + "\n")
 
