@@ -119,6 +119,9 @@ func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyRunes:
 			m.filter += string(msg.Runes)
 			m.cursor = 0
+		case tea.KeySpace:
+			m.filter += " "
+			m.cursor = 0
 
 		case tea.KeyBackspace:
 			if len(m.filter) > 0 {
