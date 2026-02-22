@@ -56,7 +56,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				huh.NewGroup(
 					huh.NewInput().
 						Title("Search query").
-						Description("Edit the query to search for your series").
+						Description("\nEdit the query to search for your series").
 						Value(&searchQuery),
 				),
 			).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
@@ -125,12 +125,12 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 
 		case 4:
 			// Live filename preview
-			preview := buildFilenamePreview(inputPatterns, outputFields, " ")
+			preview := buildFilenamePreview(outputFields, " ")
 			err := RunForm(huh.NewForm(
 				huh.NewGroup(
 					huh.NewNote().
 						Title("Example output").
-						Description(fmt.Sprintf("With current settings, a file might be renamed to:\n\n  %s", preview)),
+						Description(fmt.Sprintf("\nWith current settings, a file might be renamed to:\n\n  %s", preview)),
 				),
 			).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
 
@@ -168,7 +168,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				refinementFields = append(refinementFields,
 					huh.NewInput().
 						Title("Filler URL").
-						Description("Optional. Clear to skip.").
+						Description("\nOptional. Clear to skip.").
 						Value(&fillerURL),
 				)
 			}
@@ -176,7 +176,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				refinementFields = append(refinementFields,
 					huh.NewInput().
 						Title("Separator").
-						Description("Character(s) between output fields").
+						Description("\nCharacter(s) between output fields").
 						Value(&separator),
 				)
 			}
@@ -184,7 +184,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				refinementFields = append(refinementFields,
 					huh.NewInput().
 						Title("Episode offset").
-						Description("Optional. Maps local → DB episode numbers").
+						Description("\nOptional. Maps local → DB episode numbers").
 						Value(&offsetStr).
 						Validate(validateInt),
 				)
@@ -193,7 +193,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				refinementFields = append(refinementFields,
 					huh.NewInput().
 						Title("Episode padding").
-						Description("Optional. Force digit width (e.g. 2 → 01)").
+						Description("\nOptional. Force digit width (e.g. 2 → 01)").
 						Value(&paddingStr).
 						Validate(validateInt),
 				)
@@ -258,7 +258,7 @@ func runInitWizard(ctx context.Context, cmd *cobra.Command, absPath string, scan
 				huh.NewGroup(
 					huh.NewConfirm().
 						Title("Fetch database now?").
-						Description("Download episode data from the provider").
+						Description("\nDownload episode data from the provider").
 						Value(&fetchDB),
 				),
 			).WithTheme(theme).WithKeyMap(autotitleKeyMap()))
@@ -297,7 +297,7 @@ func selectInputPatterns(detected []string, theme *huh.Theme) ([]string, error) 
 			huh.NewGroup(
 				huh.NewInput().
 					Title("Input patterns").
-					Description("Enter patterns (comma-separated). Placeholders: {{EP_NUM}}, {{SERIES}}, {{RES}}, {{ANY}}, {{EXT}}").
+					Description("\nEnter patterns (comma-separated). Placeholders: {{EP_NUM}}, {{SERIES}}, {{RES}}, {{ANY}}, {{EXT}}").
 					Value(&input).
 					Validate(func(s string) error {
 						if strings.TrimSpace(s) == "" {
@@ -323,6 +323,7 @@ func selectInputPatterns(detected []string, theme *huh.Theme) ([]string, error) 
 
 	case 1:
 		for {
+			ClearAndPrintBanner()
 			// One pattern: select it or add custom
 			choice := ""
 			err := RunForm(huh.NewForm(
@@ -359,6 +360,7 @@ func selectInputPatterns(detected []string, theme *huh.Theme) ([]string, error) 
 
 	default:
 		for {
+			ClearAndPrintBanner()
 			// Multiple patterns: multi-select with all pre-checked
 			allChoices := make([]string, len(detected))
 			copy(allChoices, detected)
@@ -442,9 +444,12 @@ func selectOutputFields(theme *huh.Theme) ([]string, error) {
 	choice := ""
 	err := RunForm(huh.NewForm(
 		huh.NewGroup(
+			huh.NewNote().
+				Title("Output Format Legend").
+				Description("\n• SERIES — Series name (English)\n• EP\\_NUM — Episode number (e.g. 01)\n• EP\\_NAME — Episode title\n• FILLER — Filler tag (if detected)\n• RES    — Resolution (e.g. 1080p)\n• +      — Dynamic spacing/glue"),
+
 			huh.NewSelect[string]().
-				Title("Output format").
-				Description("Tokens: SERIES, EP_NUM, EP_NAME, FILLER, RES, + (glue), literals").
+				Title("Output format\n").
 				Options(opts...).
 				Value(&choice),
 		),
@@ -459,7 +464,7 @@ func selectOutputFields(theme *huh.Theme) ([]string, error) {
 			huh.NewGroup(
 				huh.NewInput().
 					Title("Custom output fields").
-					Description("Enter fields (comma-separated). e.g: SERIES, -, EP_NUM, -, EP_NAME").
+					Description("\nEnter fields (comma-separated). e.g: SERIES, -, EP_NUM, -, EP_NAME").
 					Value(&input).
 					Validate(func(s string) error {
 						// we allow empty for going back!
@@ -486,7 +491,7 @@ func selectOutputFields(theme *huh.Theme) ([]string, error) {
 }
 
 // buildFilenamePreview creates an example filename using mock episode data.
-func buildFilenamePreview(inputPatterns, outputFields []string, separator string) string {
+func buildFilenamePreview(outputFields []string, separator string) string {
 	// Build from output fields with mock data
 	fieldMap := map[string]string{
 		"SERIES":    "Bleach",
@@ -569,7 +574,7 @@ func promptManualURL(theme *huh.Theme) (string, error) {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Provider URL").
-				Description("Enter a MAL, TMDB, or other supported provider URL").
+				Description("\nEnter a MAL, TMDB, or other supported provider URL").
 				Value(&url).
 				Validate(func(s string) error {
 					s = strings.TrimSpace(s)
@@ -594,9 +599,12 @@ func promptCustomPatterns(theme *huh.Theme) ([]string, error) {
 	input := ""
 	err := RunForm(huh.NewForm(
 		huh.NewGroup(
+			huh.NewNote().
+				Title("Input Placeholder Legend").
+				Description("\n• {{SERIES}} — Matches series name\n• {{EP\\_NUM}} — Matches episode number\n• {{RES}}    — Matches resolution (e.g. 1080p)\n• {{ANY}}    — Matches any character(s)\n• {{EXT}}    — Matches file extension"),
 			huh.NewInput().
 				Title("Custom input patterns").
-				Description("Leave empty to go back. Placeholders: {{EP_NUM}}, {{SERIES}}, {{RES}}, {{ANY}}, {{EXT}}").
+				Description("\nLeave empty to go back").
 				Value(&input).
 				Validate(func(s string) error {
 					// empty is ok, we handle it as 'back'

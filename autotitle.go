@@ -77,7 +77,7 @@ type Options struct {
 	Force     bool
 
 	// Search options
-	Provider string
+	Providers []string
 }
 
 var defaultEvents types.EventHandler
@@ -148,9 +148,9 @@ func WithNoTagging() Option {
 	return func(o *Options) { o.NoTag = true }
 }
 
-// WithProvider filters search results to a specific provider
-func WithProvider(provider string) Option {
-	return func(o *Options) { o.Provider = provider }
+// WithProvider filters search results to specific providers
+func WithProvider(providers ...string) Option {
+	return func(o *Options) { o.Providers = append(o.Providers, providers...) }
 }
 
 // Rename renames media files in the specified directory
@@ -545,7 +545,7 @@ func DBGen(ctx context.Context, url string, opts ...Option) (bool, error) {
 }
 
 // Search queries the configured providers for media matching the query in parallel.
-// If WithProvider is used, it only queries that specific provider.
+// If WithProvider is used, it only queries those specific providers.
 func Search(ctx context.Context, query string, opts ...Option) ([]types.SearchResult, error) {
 	ch := SearchStream(ctx, query, opts...)
 	var results []types.SearchResult
@@ -572,7 +572,7 @@ func SearchStream(ctx context.Context, query string, opts ...Option) <-chan type
 
 	// Check cache
 	searchCacheMu.RLock()
-	if cached, ok := searchCache[query]; ok && options.Provider == "" {
+	if cached, ok := searchCache[query]; ok && len(options.Providers) == 0 {
 		searchCacheMu.RUnlock()
 		go func() {
 			for _, r := range cached {
@@ -588,8 +588,12 @@ func SearchStream(ctx context.Context, query string, opts ...Option) <-chan type
 
 	// Determine which providers to query
 	var names []string
-	if options.Provider != "" {
-		names = []string{options.Provider}
+	if len(options.Providers) > 0 {
+		for _, name := range options.Providers {
+			if _, err := provider.GetProvider(name); err == nil {
+				names = append(names, name)
+			}
+		}
 	} else {
 		names = provider.ListProviders()
 	}
@@ -628,7 +632,7 @@ func SearchStream(ctx context.Context, query string, opts ...Option) <-chan type
 
 	go func() {
 		wg.Wait()
-		if options.Provider == "" {
+		if len(options.Providers) == 0 {
 			searchCacheMu.Lock()
 			searchCache[query] = results
 			searchCacheMu.Unlock()
