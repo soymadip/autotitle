@@ -154,5 +154,5 @@ func runInitNonInteractive(cmd *cobra.Command, absPath string) {
 
 	defaults := config.GetDefaults()
 	mapFile := defaults.MapFile
-	logger.Info(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Created config"), ui.StylePath.Render(filepath.Join(absPath, mapFile))))
+	logger.Success(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Created config"), ui.StylePath.Render(filepath.Join(absPath, mapFile))))
 }

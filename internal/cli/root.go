@@ -24,7 +24,7 @@ var (
 	flagFillerURL string
 	flagForce     bool
 
-	logger *log.Logger
+	logger *ui.Logger
 )
 
 var RootCmd = &cobra.Command{
@@ -74,15 +74,16 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Suppress output except errors")
 
 	// Default logger setup (before flags parse)
-	logger = log.New(os.Stdout)
-	ui.SetLogger(logger)
+	l := log.New(os.Stdout)
+	ui.SetLogger(l)
 	ui.ConfigureLoggerStyles()
+	logger = &ui.Logger{Logger: l}
 
 	autotitle.SetDefaultEventHandler(func(e autotitle.Event) {
 		msg := ui.ColorizeEvent(e.Message)
 		switch e.Type {
 		case autotitle.EventSuccess:
-			logger.Info(msg)
+			logger.Success(msg)
 		case autotitle.EventWarning:
 			logger.Warn(msg)
 		case autotitle.EventError:

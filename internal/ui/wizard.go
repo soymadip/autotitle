@@ -288,7 +288,7 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 			mapPath := filepath.Join(absPath, config.GetDefaults().MapFile)
 
 			if logger != nil {
-				logger.Info(fmt.Sprintf("%s %s", StyleHeader.Render("Configuration saved to:"), StylePath.Render(mapPath)))
+				logger.Success(fmt.Sprintf("%s %s", StyleHeader.Render("Configuration saved to:"), StylePath.Render(mapPath)))
 				fmt.Println()
 			}
 
@@ -328,7 +328,7 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 			}
 
 			if logger != nil {
-				logger.Info(StyleHeader.Render("Database generated successfully"))
+				logger.Success(StyleHeader.Render("Database generated successfully"))
 			}
 			return nil
 		}

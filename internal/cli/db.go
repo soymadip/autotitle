@@ -94,7 +94,7 @@ func runDBGen(ctx context.Context, url string) {
 	}
 
 	if generated {
-		logger.Info(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Database generated"), ui.StylePath.Render(url)))
+		logger.Success(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Database generated"), ui.StylePath.Render(url)))
 	} else {
 		logger.Info(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Database cached"), ui.StylePath.Render(url)))
 	}
@@ -159,7 +159,7 @@ func runDBRm(ctx context.Context, args []string) {
 			logger.Error("Failed to delete all databases", "error", err)
 			os.Exit(1)
 		}
-		logger.Info(ui.StyleHeader.Render("Deleted all databases"))
+		logger.Success(ui.StyleHeader.Render("Deleted all databases"))
 		return
 	}
 
@@ -179,7 +179,7 @@ func runDBRm(ctx context.Context, args []string) {
 		logger.Error("Failed to delete database", "error", err)
 		os.Exit(1)
 	}
-	logger.Info(fmt.Sprintf("%s: %s/%s", ui.StyleHeader.Render("Deleted database"), prov, ui.StylePath.Render(id)))
+	logger.Success(fmt.Sprintf("%s: %s/%s", ui.StyleHeader.Render("Deleted database"), prov, ui.StylePath.Render(id)))
 }
 
 func runDBPath() {

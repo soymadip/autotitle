@@ -29,5 +29,5 @@ func runUndo(cmd *cobra.Command, path string) {
 		os.Exit(1)
 	}
 	fmt.Println()
-	logger.Info(ui.StyleHeader.Render("Files restored from backup"))
+	logger.Success(ui.StyleHeader.Render("Files restored from backup"))
 }

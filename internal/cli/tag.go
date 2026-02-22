@@ -49,7 +49,7 @@ func runTag(cmd *cobra.Command, path string) {
 			case autotitle.EventInfo:
 				logger.Info(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Tag"), e.Message))
 			case autotitle.EventSuccess:
-				logger.Info(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Tagged"), e.Message))
+				logger.Success(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Tagged"), e.Message))
 			case autotitle.EventWarning:
 				logger.Warn(fmt.Sprintf("%s: %s", ui.StyleHeader.Render("Tag Warning"), e.Message))
 			case autotitle.EventError:
