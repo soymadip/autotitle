@@ -41,7 +41,7 @@ func showPreviewAndConfirm(cfg *types.Config, theme *huh.Theme) (bool, error) {
 		huh.NewGroup(
 			huh.NewNote().
 				Title("Configuration Preview").
-				Description(fmt.Sprintf("\n%s\n\n", StyleDim.Render(string(data)))),
+				Description(fmt.Sprintf("\n%s\n\n", HighlightYAML(string(data)))),
 
 			huh.NewConfirm().
 				Title("Write configuration?").

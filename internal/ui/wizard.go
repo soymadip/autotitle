@@ -287,16 +287,15 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 			// Final success and DB generation offer
 			mapPath := filepath.Join(absPath, config.GetDefaults().MapFile)
 
-			// Show success note and DB fetch prompt together for a cleaner finish
+			if logger != nil {
+				logger.Info(fmt.Sprintf("%s %s", StyleHeader.Render("Configuration saved to:"), StylePath.Render(mapPath)))
+				fmt.Println()
+			}
+
+			// Offer DB generation
 			fetchDB := true
 			err := RunForm(huh.NewForm(
 				huh.NewGroup(
-					huh.NewNote().
-						Title("Success!").
-						Description(fmt.Sprintf("\n%s\n%s\n",
-							StyleHeader.Render("Configuration saved to:"),
-							StylePath.Render(mapPath),
-						)),
 					huh.NewConfirm().
 						Title("Fetch database now?").
 						Description("Download episode data from the provider to enable renaming.").

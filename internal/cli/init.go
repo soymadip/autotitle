@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -102,21 +103,31 @@ func runInit(cmd *cobra.Command, path string) {
 		os.Exit(1)
 	}
 
+	// Helper for safe flag access
+	hasFlag := func(f string) bool {
+		return cmd != nil && cmd.Flags().Lookup(f) != nil && cmd.Flags().Changed(f)
+	}
+
 	// Run the wizard
 	flags := ui.InitFlags{
 		URL:          flagInitURL,
 		FillerURL:    flagInitFillerURL,
-		HasFiller:    cmd.Flags().Changed("filler"),
+		HasFiller:    hasFlag("filler"),
 		Separator:    flagInitSeparator,
-		HasSeparator: cmd.Flags().Changed("separator"),
+		HasSeparator: hasFlag("separator"),
 		Offset:       flagInitOffset,
-		HasOffset:    cmd.Flags().Changed("offset"),
+		HasOffset:    hasFlag("offset"),
 		Padding:      flagInitPadding,
-		HasPadding:   cmd.Flags().Changed("padding"),
+		HasPadding:   hasFlag("padding"),
 		DryRun:       flagDryRun,
 	}
 
-	if err := ui.RunInitWizard(cmd.Context(), absPath, scanResult, flags); err != nil {
+	ctx := context.Background()
+	if cmd != nil {
+		ctx = cmd.Context()
+	}
+
+	if err := ui.RunInitWizard(ctx, absPath, scanResult, flags); err != nil {
 		logger.Error("Init failed", "error", err)
 		os.Exit(1)
 	}

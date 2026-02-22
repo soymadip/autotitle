@@ -103,6 +103,9 @@ func swapYAMLExtension(path string) string {
 func LoadFile(path string) (*types.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, types.ErrConfigNotFound{Path: path}
+		}
 		return nil, fmt.Errorf("failed to read map file: %w", err)
 	}
 

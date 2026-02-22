@@ -149,3 +149,49 @@ func ColorizeEvent(msg string) string {
 
 	return msg
 }
+
+// HighlightYAML applies simple syntax highlighting to a YAML string for TUI display.
+func HighlightYAML(input string) string {
+	lines := strings.Split(input, "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// 1. Handle Comments
+		if idx := strings.Index(line, "#"); idx >= 0 {
+			lines[i] = line[:idx] + StyleDim.Render(line[idx:])
+			continue
+		}
+
+		// 2. Handle Key-Value pairs
+		// Find first colon that isn't inside a string (simplistic)
+		if idx := strings.Index(line, ":"); idx >= 0 {
+			key := line[:idx]
+			val := line[idx:] // Includes the colon
+
+			// Style for keys (cyan/bold)
+			keyStyle := lipgloss.NewStyle().Foreground(colorCommand).Bold(true)
+			// Style for values (pale green)
+			valStyle := lipgloss.NewStyle().Foreground(colorPattern)
+
+			// Determine if it's a list item
+			prefix := ""
+			if strings.HasPrefix(strings.TrimSpace(key), "- ") {
+				pIdx := strings.Index(key, "- ")
+				prefix = key[:pIdx+2]
+				key = key[pIdx+2:]
+			}
+
+			// Assemble highlighted line
+			if strings.TrimSpace(val) == ":" {
+				// Just a key (likely followed by nested object/list)
+				lines[i] = prefix + keyStyle.Render(key) + ":"
+			} else {
+				// Key: Value
+				lines[i] = prefix + keyStyle.Render(key) + ":" + valStyle.Render(val[1:])
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}

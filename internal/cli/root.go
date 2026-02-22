@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/log"
 	"github.com/mydehq/autotitle"
+	"github.com/mydehq/autotitle/internal/types"
 	"github.com/mydehq/autotitle/internal/ui"
 	"github.com/mydehq/autotitle/internal/version"
 	"github.com/spf13/cobra"
@@ -134,6 +136,25 @@ func runRename(ctx context.Context, cmd *cobra.Command, path string) {
 
 	ops, err := autotitle.Rename(ctx, path, opts...)
 	if err != nil {
+		if _, ok := err.(types.ErrConfigNotFound); ok {
+			logger.Error(fmt.Sprintf("No %s found in %s", ui.StylePattern.Render("_autotitle.yml"), ui.StylePath.Render(path)))
+			fmt.Println()
+			confirmInit := true
+			err := ui.RunForm(huh.NewForm(
+				huh.NewGroup(
+					huh.NewConfirm().
+						Title("Initialize now?").
+						Description("Start the setup wizard to create a new configuration.").
+						Value(&confirmInit),
+				),
+			).WithTheme(ui.AutotitleTheme()).WithKeyMap(ui.AutotitleKeyMap()))
+
+			if err == nil && confirmInit {
+				runInit(cmd, path)
+				return
+			}
+			os.Exit(0)
+		}
 		logger.Error("Operation failed", "error", err)
 		os.Exit(1)
 	}
