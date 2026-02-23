@@ -325,13 +325,7 @@ func Init(ctx context.Context, path string, opts ...Option) error {
 
 	// Build configuration
 	url := options.URL
-	if url == "" {
-		url = "https://myanimelist.net/anime/XXXXX/Series_Name"
-	}
 	fillerURL := options.FillerURL
-	if fillerURL == "" {
-		fillerURL = "https://www.animefillerlist.com/shows/series-name"
-	}
 
 	offset := 0
 	if options.Offset != nil {

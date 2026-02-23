@@ -52,8 +52,8 @@ var defaultMapFile = types.Config{
 	Targets: []types.Target{
 		{
 			Path:      ".",
-			URL:       "https://myanimelist.net/anime/XXXXX/Series_Name",
-			FillerURL: "https://www.animefillerlist.com/shows/series-name",
+			URL:       "",
+			FillerURL: "",
 			Patterns:  defaults.Patterns,
 		},
 	},
@@ -233,9 +233,7 @@ func GenerateDefault(url, fillerURL string, inputPatterns []string, separator st
 		target.URL = url
 	}
 
-	if fillerURL != "" {
-		target.FillerURL = fillerURL
-	}
+	target.FillerURL = fillerURL
 
 	// If input patterns are provided, we only want those.
 	if len(inputPatterns) > 0 {

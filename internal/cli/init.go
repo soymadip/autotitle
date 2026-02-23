@@ -85,11 +85,13 @@ func runInit(cmd *cobra.Command, path string) {
 					Value(&overwrite),
 			),
 		).WithTheme(ui.AutotitleTheme()))
+
 		if err != nil {
 			ui.HandleAbort(err)
 			logger.Error("Init failed", "error", err)
 			os.Exit(1)
 		}
+
 		if !overwrite {
 			logger.Warn(ui.StyleDim.Render("Init cancelled"))
 			return
