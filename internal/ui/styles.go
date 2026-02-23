@@ -36,6 +36,10 @@ var (
 		Dark:  lipgloss.CompleteColor{TrueColor: "#ff5faf", ANSI256: "204", ANSI: "13"},
 		Light: lipgloss.CompleteColor{TrueColor: "#af005f", ANSI256: "125", ANSI: "5"},
 	}
+	colorError = lipgloss.CompleteAdaptiveColor{
+		Dark:  lipgloss.CompleteColor{TrueColor: "#ff5faf", ANSI256: "204", ANSI: "13"},
+		Light: lipgloss.CompleteColor{TrueColor: "#af005f", ANSI256: "125", ANSI: "5"},
+	}
 
 	// Exported Styles for CLI and TUI
 	StyleHeader  = lipgloss.NewStyle().Bold(true).Foreground(colorHeader)
@@ -44,6 +48,7 @@ var (
 	StylePattern = lipgloss.NewStyle().Foreground(colorPattern)
 	StyleDim     = lipgloss.NewStyle().Foreground(colorDim)
 	StyleFlag    = lipgloss.NewStyle().Italic(true).Foreground(colorFlag)
+	StyleError   = lipgloss.NewStyle().Foreground(colorError)
 
 	// StyleBanner is the main wizard title banner
 	StyleBanner = lipgloss.NewStyle().

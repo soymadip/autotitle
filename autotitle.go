@@ -600,6 +600,8 @@ func SearchStream(ctx context.Context, query string, opts ...Option) <-chan type
 
 	var results []types.SearchResult
 	var resultsMu sync.Mutex
+	var anyError bool
+	var errorMu sync.Mutex
 
 	var wg sync.WaitGroup
 	for _, name := range names {
@@ -615,6 +617,13 @@ func SearchStream(ctx context.Context, query string, opts ...Option) <-chan type
 			defer wg.Done()
 			res, err := p.Search(ctx, query)
 			if err != nil {
+				errorMu.Lock()
+				anyError = true
+				errorMu.Unlock()
+				select {
+				case ch <- types.SearchResult{Provider: p.Name(), Error: err}:
+				case <-ctx.Done():
+				}
 				return
 			}
 			for _, r := range res {
@@ -632,7 +641,7 @@ func SearchStream(ctx context.Context, query string, opts ...Option) <-chan type
 
 	go func() {
 		wg.Wait()
-		if len(options.Providers) == 0 {
+		if len(options.Providers) == 0 && !anyError {
 			searchCacheMu.Lock()
 			searchCache[query] = results
 			searchCacheMu.Unlock()

@@ -40,6 +40,7 @@ type SearchResult struct {
 	Title    string
 	Year     int
 	URL      string
+	Error    error
 }
 
 // FillerSource is a source for filler episode data (decoupled from providers)

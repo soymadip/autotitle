@@ -13,6 +13,9 @@ import (
 	"github.com/mydehq/autotitle/internal/types"
 )
 
+// ErrSearchAgain is returned when the user chooses "Search again" in the picker.
+var ErrSearchAgain = fmt.Errorf("search again")
+
 // streamResultMsg delivers a single search result to the Bubble Tea model.
 type streamResultMsg struct {
 	result types.SearchResult
@@ -31,7 +34,9 @@ type searchPicker struct {
 	done     bool // all providers finished
 	aborted  bool
 	chosen   bool
+	rescan   bool // User wants to search again
 	filter   string
+	errs     []error
 
 	// Visible window for scrolling
 	windowSize int
@@ -73,7 +78,11 @@ func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case streamResultMsg:
-		m.results = append(m.results, msg.result)
+		if msg.result.Error != nil {
+			m.errs = append(m.errs, msg.result.Error)
+		} else {
+			m.results = append(m.results, msg.result)
+		}
 		return m, waitForResult(m.ch)
 
 	case streamDoneMsg:
@@ -100,10 +109,16 @@ func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case tea.KeyEnter:
-			if len(filtered) > 0 && m.cursor < len(filtered) {
-				m.chosen = true
-				m.selected = filtered[m.cursor].URL
-				return m, tea.Quit
+			if len(filtered) > 0 {
+				if m.cursor == len(filtered) { // "Search again..." item
+					m.rescan = true
+					return m, tea.Quit
+				}
+				if m.cursor < len(filtered) {
+					m.chosen = true
+					m.selected = filtered[m.cursor].URL
+					return m, tea.Quit
+				}
 			}
 
 		case tea.KeyUp, tea.KeyShiftTab:
@@ -112,7 +127,11 @@ func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyDown, tea.KeyTab:
-			if m.cursor < len(filtered)-1 {
+			limit := len(filtered) - 1
+			if m.done {
+				limit++ // Allow selecting "Search again..."
+			}
+			if m.cursor < limit {
 				m.cursor++
 			}
 
@@ -140,6 +159,9 @@ func (m searchPicker) View() string {
 	// Title
 	title := StyleHeader.Render("Select your series")
 
+	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(colorCommand)
+	providerStyle := StyleDim
+
 	// Status indicator
 	var status string
 	filtered := m.filteredResults()
@@ -158,7 +180,14 @@ func (m searchPicker) View() string {
 
 	if len(filtered) == 0 {
 		if m.done {
-			b.WriteString(StyleDim.Render("  No results found.") + "\n")
+			if len(m.errs) > 0 {
+				b.WriteString(StyleError.Render(fmt.Sprintf("  Search failed: %v", m.errs[0])) + "\n")
+				if len(m.errs) > 1 {
+					b.WriteString(StyleDim.Render(fmt.Sprintf("  (+%d other errors)", len(m.errs)-1)) + "\n")
+				}
+			} else {
+				b.WriteString(StyleDim.Render("  No results found.") + "\n")
+			}
 		} else {
 			b.WriteString(StyleDim.Render("  Waiting for results…") + "\n")
 		}
@@ -183,9 +212,6 @@ func (m searchPicker) View() string {
 			b.WriteString(StyleDim.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
 		}
 
-		selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(colorCommand)
-		providerStyle := StyleDim
-
 		for i := start; i < end; i++ {
 			r := filtered[i]
 
@@ -202,8 +228,16 @@ func (m searchPicker) View() string {
 			}
 		}
 
-		if end < len(filtered) {
-			b.WriteString(StyleDim.Render(fmt.Sprintf("  ↓ %d more", len(filtered)-end)) + "\n")
+	}
+
+	// Static "Search again..." item
+	if m.done {
+		label := "Search again..."
+		isFocused := m.cursor == len(filtered)
+		if isFocused {
+			b.WriteString("  " + selectedStyle.Render("> "+label) + "\n")
+		} else {
+			b.WriteString("    " + StyleDim.Render(label) + "\n")
 		}
 	}
 
@@ -254,6 +288,11 @@ func runStreamingSearch(ctx context.Context, query string) (string, error) {
 			return "", huh.ErrUserAborted
 		}
 		return "", huh.ErrUserAborted
+	}
+
+	if m.rescan {
+		autotitle.ClearSearchCache()
+		return "", ErrSearchAgain
 	}
 
 	if m.chosen {

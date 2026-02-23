@@ -93,6 +93,10 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 			// Live streaming search across all providers
 			url, err := runStreamingSearch(ctx, searchQuery) // Note: small 'r'
 			if err != nil {
+				if errors.Is(err, ErrSearchAgain) {
+					step--
+					continue
+				}
 				if errors.Is(HandleAbort(err), ErrUserBack) {
 					step--
 					continue
@@ -299,7 +303,6 @@ func RunInitWizard(ctx context.Context, absPath string, scan *config.ScanResult,
 				huh.NewGroup(
 					huh.NewConfirm().
 						Title("Start renaming now?").
-						Description("Match and rename local files based on database titles.").
 						Value(&startRename),
 				),
 			).WithTheme(theme).WithKeyMap(AutotitleKeyMap()))
