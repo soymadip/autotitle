@@ -5,6 +5,7 @@ bin/
 dist/
 autotitle
 CHANGELOG.md
+vendor/
 
 # Testing
 test*/

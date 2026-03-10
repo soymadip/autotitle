@@ -90,3 +90,24 @@ run = "cz --config $CZ_CONFIG changelog \"{{ env.LATEST_TAG}}..{{env.LATEST_TAG}
 [tasks.bump]
 description = "Bump version"
 run = "cz --config $CZ_CONFIG bump"
+
+[tasks.update-nix-hash]
+description = "Update Nix vendorHash in flake.nix"
+run = """
+    echo "Calculating new vendorHash..."
+
+    # Set a dummy hash to force a mismatch and catch the correct one
+    sed -i 's/vendorHash = ".*";/vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";/' flake.nix
+    
+    # Run the build and capture the 'got:' hash from stderr
+    NEW_HASH=$(nix build .#default --no-link --extra-experimental-features "nix-command flakes" 2>&1 | grep "got:" | cut -d: -f2 | xargs)
+    
+    if [ -n "$NEW_HASH" ]; then
+        echo "Updating flake.nix with hash: $NEW_HASH"
+        sed -i "s|vendorHash = \".*\";|vendorHash = \"$NEW_HASH\";|" flake.nix
+        echo "Done!"
+    else
+        echo "Error: Could not determine new hash. Build might have failed for other reasons."
+        exit 1
+    fi
+"""
