@@ -36,6 +36,11 @@ paru -S autotitle
 # In Windows, from winget
 winget install mydehq.autotitle
 
+# Using Nix
+nix build github:mydehq/autotitle  # To build
+nix run github:mydehq/autotitle    # To run directly
+nix develop github:mydehq/autotitle # For development env
+
 # Or build manually
 git clone https://github.com/mydehq/autotitle.git && cd autotitle
 mise install-bin
