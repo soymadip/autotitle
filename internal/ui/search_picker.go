@@ -109,16 +109,14 @@ func (m searchPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case tea.KeyEnter:
-			if len(filtered) > 0 {
-				if m.cursor == len(filtered) { // "Search again..." item
-					m.rescan = true
-					return m, tea.Quit
-				}
-				if m.cursor < len(filtered) {
-					m.chosen = true
-					m.selected = filtered[m.cursor].URL
-					return m, tea.Quit
-				}
+			if m.cursor == len(filtered) { // "Search again..." item
+				m.rescan = true
+				return m, tea.Quit
+			}
+			if len(filtered) > 0 && m.cursor < len(filtered) {
+				m.chosen = true
+				m.selected = filtered[m.cursor].URL
+				return m, tea.Quit
 			}
 
 		case tea.KeyUp, tea.KeyShiftTab:

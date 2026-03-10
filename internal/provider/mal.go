@@ -177,17 +177,11 @@ func (p *MALProvider) fetchAnimeInfo(ctx context.Context, malID int) (*animeInfo
 		return nil, err
 	}
 
-	resp, err := p.client.Do(req)
+	resp, err := DoWithRetry(ctx, p.client, req, "Jikan", p.sleep)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch anime info: %w", err)
+		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == 429 {
-		// Rate limited, wait and retry
-		time.Sleep(2 * time.Second)
-		return p.fetchAnimeInfo(ctx, malID)
-	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, types.ErrAPIError{
