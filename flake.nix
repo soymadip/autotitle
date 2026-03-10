@@ -17,7 +17,7 @@
       {
         packages.default = (pkgs.buildGoModule.override { inherit go; }) {
           pname = "autotitle";
-          version = "1.13.0"; # Should be synced with tags/version.go
+          version = "1.15.0"; # Should be synced with tags/version.go
 
           src = ./.;
 
@@ -27,7 +27,7 @@
           ldflags = [
             "-s"
             "-w"
-            "-X github.com/mydehq/autotitle/internal/version.Version=v1.13.0"
+            "-X github.com/mydehq/autotitle/internal/version.Version=v1.15.0"
             "-X github.com/mydehq/autotitle/internal/version.Commit=none"
             "-X github.com/mydehq/autotitle/internal/version.Date=unknown"
           ];
